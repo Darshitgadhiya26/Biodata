@@ -1,0 +1,313 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   Design tokens
+   Light  = ivory paper, charcoal ink, champagne gold accent
+   Dark   = deep espresso/ink, warm parchment ink, brighter gold
+   Dark mode is a separate palette, not an inversion.
+   ============================================================ */
+@layer base {
+  :root {
+    --c-ivory: 252 250 246;
+    --c-surface: 255 253 250;
+    --c-surface-raised: 255 255 255;
+    --c-charcoal: 28 27 26;
+    --c-muted: 92 88 82;
+    --c-subtle: 138 132 124;
+    --c-line: 232 226 216;
+    --c-gold: 176 141 76;
+    --c-gold-soft: 216 190 134;
+    --c-gold-deep: 138 106 48;
+    --c-danger: 178 48 48;
+    --c-success: 40 120 84;
+    --c-shadow: 60 48 30;
+
+    color-scheme: light;
+  }
+
+  .dark {
+    --c-ivory: 17 16 15;
+    --c-surface: 24 22 21;
+    --c-surface-raised: 32 29 27;
+    --c-charcoal: 241 237 230;
+    --c-muted: 178 171 161;
+    --c-subtle: 137 130 121;
+    --c-line: 55 50 46;
+    --c-gold: 214 181 122;
+    --c-gold-soft: 233 209 165;
+    --c-gold-deep: 176 141 76;
+    --c-danger: 232 122 122;
+    --c-success: 106 190 150;
+    --c-shadow: 0 0 0;
+
+    color-scheme: dark;
+  }
+
+  * {
+    @apply border-line;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    /* Sticky nav offset for in-page anchors */
+    scroll-padding-top: 5.5rem;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-ivory text-charcoal font-sans antialiased;
+    text-rendering: optimizeLegibility;
+    /* Never allow a stray wide element to scroll the page sideways */
+    overflow-x: hidden;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-display;
+    text-wrap: balance;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-gold ring-offset-2 ring-offset-ivory rounded-sm;
+  }
+
+  ::selection {
+    background: rgb(var(--c-gold) / 0.28);
+  }
+
+  /* Respect the OS-level motion preference everywhere, including for
+     Framer Motion's transform/opacity animations. */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  .container-luxe {
+    @apply mx-auto w-full max-w-6xl px-5 sm:px-8;
+  }
+
+  .card-luxe {
+    @apply rounded-3xl border border-line bg-surface-raised shadow-card;
+  }
+
+  .glass-luxe {
+    @apply border border-white/40 bg-white/70 backdrop-blur-xl;
+  }
+
+  .dark .glass-luxe {
+    @apply border-white/10 bg-black/40;
+  }
+
+  .eyebrow {
+    @apply text-[0.68rem] font-medium uppercase tracking-luxe text-gold;
+  }
+
+  .divider-gold {
+    @apply h-px w-full bg-gold-line;
+  }
+
+  /* Ornamental corner flourish used on premium cards */
+  .flourish::before,
+  .flourish::after {
+    content: '';
+    position: absolute;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-color: rgb(var(--c-gold) / 0.5);
+    pointer-events: none;
+  }
+
+  .flourish::before {
+    top: 0.75rem;
+    left: 0.75rem;
+    border-top-width: 1px;
+    border-left-width: 1px;
+    border-top-left-radius: 0.5rem;
+  }
+
+  .flourish::after {
+    right: 0.75rem;
+    bottom: 0.75rem;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-bottom-right-radius: 0.5rem;
+  }
+
+  .skeleton {
+    @apply relative overflow-hidden rounded-md bg-line/60;
+  }
+
+  .skeleton::after {
+    content: '';
+    @apply absolute inset-0 -translate-x-full animate-shimmer;
+    background: linear-gradient(90deg, transparent, rgb(var(--c-surface-raised) / 0.65), transparent);
+  }
+
+  /* Hides content visually but keeps it for assistive technology */
+  .sr-only-focusable:not(:focus):not(:focus-within) {
+    @apply sr-only;
+  }
+}
+
+/* ============================================================
+   Print / PDF layout
+   Produces a clean, professionally typeset marriage biodata sheet:
+   navigation, buttons, toasts and animations are removed.
+   ============================================================ */
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm 14mm 16mm;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #16150f !important;
+  }
+
+  /* Force the light palette on paper regardless of the on-screen theme */
+  html,
+  html.dark {
+    --c-ivory: 255 255 255;
+    --c-surface: 255 255 255;
+    --c-surface-raised: 255 255 255;
+    --c-charcoal: 22 21 15;
+    --c-muted: 70 66 60;
+    --c-subtle: 110 104 96;
+    --c-line: 214 205 188;
+    --c-gold: 154 121 60;
+    --c-gold-soft: 190 163 110;
+    --c-gold-deep: 122 94 40;
+    --c-shadow: 0 0 0;
+  }
+
+  .no-print,
+  nav[data-site-nav],
+  [data-admin-chrome],
+  [data-toast-viewport] {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+    animation: none !important;
+    transition: none !important;
+    /* Framer Motion can leave inline transforms/opacity behind */
+    transform: none !important;
+    opacity: 1 !important;
+    filter: none !important;
+  }
+
+  section,
+  .print-block {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* ---- Compress the on-screen rhythm into a typeset sheet ----
+     The screen layout breathes; paper should not. These overrides pull the
+     whole biodata onto roughly two A4 pages without touching the markup. */
+  section {
+    padding-top: 0.45rem !important;
+    padding-bottom: 0.45rem !important;
+  }
+
+  section > div > div:first-child {
+    margin-bottom: 0.6rem !important;
+  }
+
+  .container-luxe {
+    max-width: 100% !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  h1 {
+    font-size: 1.9rem !important;
+    margin-top: 0.8rem !important;
+  }
+
+  h2 {
+    font-size: 1.2rem !important;
+  }
+
+  h3 {
+    font-size: 1.05rem !important;
+  }
+
+  /* The hero portrait is a feature on screen and a passport photo on paper. */
+  [data-portrait] {
+    height: 7.5rem !important;
+    width: 7.5rem !important;
+  }
+
+  .grid {
+    gap: 0.4rem !important;
+  }
+
+  /* Cards: keep the border, drop the generous padding. */
+  [class*='rounded-3xl'],
+  [class*='rounded-2xl'] {
+    padding: 0.55rem 0.7rem !important;
+    border-radius: 0.5rem !important;
+  }
+
+  footer {
+    padding-top: 0.6rem !important;
+    padding-bottom: 0 !important;
+  }
+
+  .print-page-break {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  a[href^='http']::after,
+  a[href^='mailto']::after {
+    content: ' (' attr(href) ')';
+    font-size: 0.7em;
+    color: #6e6860;
+    word-break: break-all;
+  }
+
+  a[href^='tel']::after,
+  a[href^='#']::after {
+    content: '';
+  }
+
+  img {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .print-tight {
+    padding-top: 0 !important;
+    padding-bottom: 0.6rem !important;
+    margin-top: 0 !important;
+  }
+}
+
+.print-only {
+  display: none;
+}
