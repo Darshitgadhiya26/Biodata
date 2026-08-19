@@ -5,7 +5,7 @@
  * and read the commit that last touched a file. GITHUB_TOKEN is read from the
  * environment here and never leaves the server.
  */
-import { requireEnv } from './http';
+import { requireEnv } from './http.js';
 
 const API_ROOT = 'https://api.github.com';
 

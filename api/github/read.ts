@@ -10,10 +10,10 @@
  * are part of the publishing mechanism and stay behind the session cookie.
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { isAuthenticated } from '../_lib/auth';
-import { applySecurityHeaders, describeError, fail, json, rejectMethod } from '../_lib/http';
-import { BIODATA_PATH, GitHubError, readFile, readLastCommitDate, readRepoConfig } from '../_lib/github';
-import { validateBiodata } from '../../src/utils/biodata-schema';
+import { isAuthenticated } from '../_lib/auth.js';
+import { applySecurityHeaders, describeError, fail, json, rejectMethod } from '../_lib/http.js';
+import { BIODATA_PATH, GitHubError, readFile, readLastCommitDate, readRepoConfig } from '../_lib/github.js';
+import { validateBiodata } from '../_lib/biodata-schema.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   applySecurityHeaders(res);

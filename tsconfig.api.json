@@ -3,11 +3,15 @@
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.api.tsbuildinfo",
     "target": "ES2022",
     "lib": ["ES2023"],
-    "module": "ESNext",
+    "module": "NodeNext",
     "skipLibCheck": true,
 
-    /* Vercel bundles these with esbuild, so bundler resolution matches. */
-    "moduleResolution": "bundler",
+    /* NodeNext mirrors how Vercel actually runs these files: each .ts is
+       transpiled to an ESM .js in place, never bundled, so Node's loader
+       resolves the relative imports itself and REQUIRES the .js extension.
+       Using bundler resolution here is what hid that — it happily resolved
+       extensionless specifiers that then failed at runtime. */
+    "moduleResolution": "NodeNext",
     "isolatedModules": true,
     "moduleDetection": "force",
     "noEmit": true,
@@ -21,5 +25,5 @@
 
     "types": ["node"]
   },
-  "include": ["api", "src/utils/biodata-schema.ts"]
+  "include": ["api"]
 }

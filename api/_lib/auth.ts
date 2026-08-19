@@ -15,7 +15,7 @@
  */
 import { createHash, createHmac, randomInt, timingSafeEqual } from 'node:crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { requireEnv } from './http';
+import { requireEnv } from './http.js';
 
 export const SESSION_COOKIE = 'biodata_admin';
 

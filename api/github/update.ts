@@ -10,10 +10,10 @@
  *   4. commit — which is what triggers Vercel's automatic redeploy
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { isAuthenticated } from '../_lib/auth';
-import { applySecurityHeaders, describeError, fail, json, readJsonBody, rejectMethod } from '../_lib/http';
-import { BIODATA_PATH, GitHubError, readFileSha, readRepoConfig, writeFile } from '../_lib/github';
-import { serializeBiodata, validateBiodata } from '../../src/utils/biodata-schema';
+import { isAuthenticated } from '../_lib/auth.js';
+import { applySecurityHeaders, describeError, fail, json, readJsonBody, rejectMethod } from '../_lib/http.js';
+import { BIODATA_PATH, GitHubError, readFileSha, readRepoConfig, writeFile } from '../_lib/github.js';
+import { serializeBiodata, validateBiodata } from '../_lib/biodata-schema.js';
 
 const CONFLICT_MESSAGE =
   'The biodata was changed elsewhere. Please reload the latest version before publishing.';
