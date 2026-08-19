@@ -2,10 +2,10 @@ import { motion } from 'framer-motion';
 import { Briefcase, CalendarDays, GraduationCap, MapPin } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Biodata } from '@/types';
-import { usePrefersReducedMotion } from '@/hooks/useMediaQuery';
+import { useMotionAllowed } from '@/hooks/useTheme';
 import { calculateAge, formatDateMedium, toLines } from '@/utils/format';
-import { ProfilePhoto } from './ProfilePhoto';
 import { cn } from '@/utils/cn';
+import { ProfilePhoto } from './ProfilePhoto';
 
 interface HeroProps {
   biodata: Biodata;
@@ -18,18 +18,20 @@ interface Fact {
   value: string;
 }
 
-/** Last line of an address is the district — the most useful "location" chip. */
+/** Last line of the address is the district — the most useful "location" chip. */
 function locationFrom(biodata: Biodata): string {
-  const lines = toLines(biodata.address);
+  const lines = toLines(biodata.contact.address);
   return lines[lines.length - 1] ?? '';
 }
 
 export function Hero({ biodata, still = false }: HeroProps) {
-  const reduceMotion = usePrefersReducedMotion();
-  const animate = !still && !reduceMotion;
+  const motionAllowed = useMotionAllowed();
+  const animate = !still && motionAllowed;
 
-  const age = calculateAge(biodata.date_of_birth);
-  const dob = formatDateMedium(biodata.date_of_birth);
+  const { personal, education, career } = biodata;
+
+  const age = calculateAge(personal.dateOfBirth);
+  const dob = formatDateMedium(personal.dateOfBirth);
 
   const facts: Fact[] = [
     {
@@ -37,9 +39,9 @@ export function Hero({ biodata, still = false }: HeroProps) {
       label: 'Date of Birth',
       value: dob ? (age !== null ? `${dob} · ${age} yrs` : dob) : '—',
     },
-    { icon: GraduationCap, label: 'Education', value: biodata.degree || '—' },
-    { icon: Briefcase, label: 'Profession', value: biodata.job_title || '—' },
-    { icon: MapPin, label: 'Location', value: biodata.work_location || locationFrom(biodata) || '—' },
+    { icon: GraduationCap, label: 'Education', value: education.degree || '—' },
+    { icon: Briefcase, label: 'Profession', value: career.job || '—' },
+    { icon: MapPin, label: 'Location', value: career.workLocation || locationFrom(biodata) || '—' },
   ];
 
   const container = {
@@ -92,8 +94,8 @@ export function Hero({ biodata, still = false }: HeroProps) {
 
         <motion.div variants={animate ? item : undefined} className="mt-8 sm:mt-10">
           <ProfilePhoto
-            src={biodata.profile_photo_url}
-            name={biodata.name}
+            src={biodata.profilePhoto}
+            name={personal.name}
             size={still ? 'md' : 'lg'}
             still={still}
             priority
@@ -107,7 +109,7 @@ export function Hero({ biodata, still = false }: HeroProps) {
             still ? 'text-3xl' : 'text-[2.1rem] xs:text-5xl sm:text-6xl lg:text-7xl',
           )}
         >
-          {biodata.name}
+          {personal.name}
         </motion.h1>
 
         <motion.div variants={animate ? item : undefined} className="mt-6 flex items-center gap-3" aria-hidden>
@@ -120,14 +122,14 @@ export function Hero({ biodata, still = false }: HeroProps) {
           variants={animate ? item : undefined}
           className="mt-6 max-w-md text-sm leading-relaxed text-muted"
         >
-          {[biodata.job_title, biodata.company].filter(Boolean).join(' · ') || 'Marriage biodata'}
+          {[career.job, career.company].filter(Boolean).join(' · ') || 'Marriage biodata'}
         </motion.p>
 
-        {/* ---- Quick facts ---- */}
+        {/* ---- Quick facts ----
+            Hidden on paper: every value here is repeated in full by the
+            Personal, Education and Career sections below. */}
         <motion.dl
           variants={animate ? item : undefined}
-          /* Hidden on paper: every value here is repeated in full by the
-             Personal, Education and Career sections below. */
           className="no-print mt-12 grid w-full max-w-4xl grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4"
         >
           {facts.map(({ icon: Icon, label, value }) => (

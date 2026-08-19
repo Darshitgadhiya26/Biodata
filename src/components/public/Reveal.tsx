@@ -1,6 +1,6 @@
 import { motion, type Variants } from 'framer-motion';
 import type { ReactNode } from 'react';
-import { usePrefersReducedMotion } from '@/hooks/useMediaQuery';
+import { useMotionAllowed } from '@/hooks/useTheme';
 
 interface RevealProps {
   children: ReactNode;
@@ -15,14 +15,15 @@ interface RevealProps {
 
 /**
  * Scroll-reveal wrapper. Deliberately restrained: a short fade with a small
- * upward drift, once per element. When the visitor prefers reduced motion the
- * content is rendered immediately with no transform at all.
+ * upward drift, once per element. When the visitor prefers reduced motion — or
+ * `theme.animations` is off in the JSON — the content is rendered immediately
+ * with no transform at all.
  */
 export function Reveal({ children, className, delay = 0, y = 18, as = 'div', disabled }: RevealProps) {
-  const reduceMotion = usePrefersReducedMotion();
+  const motionAllowed = useMotionAllowed();
   const MotionTag = motion[as];
 
-  if (reduceMotion || disabled) {
+  if (!motionAllowed || disabled) {
     const Tag = as;
     return <Tag className={className}>{children}</Tag>;
   }

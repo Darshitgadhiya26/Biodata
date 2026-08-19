@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { usePrefersReducedMotion } from '@/hooks/useMediaQuery';
+import { useMotionAllowed } from '@/hooks/useTheme';
 import { initials } from '@/utils/format';
 import { cn } from '@/utils/cn';
 
@@ -32,7 +32,7 @@ export function ProfilePhoto({
   still = false,
   priority = false,
 }: ProfilePhotoProps) {
-  const reduceMotion = usePrefersReducedMotion();
+  const motionAllowed = useMotionAllowed();
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
@@ -43,7 +43,7 @@ export function ProfilePhoto({
   }, [src]);
 
   const showImage = Boolean(src) && !failed;
-  const animate = !still && !reduceMotion;
+  const animate = !still && motionAllowed;
 
   return (
     <motion.div

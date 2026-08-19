@@ -1,47 +1,45 @@
-import { useAdminBundle } from '@/layouts/AdminLayout';
-import { OrderedListEditor } from '@/components/admin/OrderedListEditor';
-import { LivePreview } from '@/components/admin/LivePreview';
-import { useAddHobby, useDeleteHobby, useReorderHobbies, useUpdateHobby } from '@/hooks/useHobbies';
+import { useMemo } from 'react';
+import { useDraft, useDraftData, useFieldErrors } from '@/hooks/useDraft';
+import { EditorPanel } from '@/components/admin/EditorPanel';
+import { ListEditor } from '@/components/admin/ListEditor';
 
+/** Edits `hobbies` — add, edit, delete and reorder. */
 export function HobbiesPage() {
-  const { biodata, hobbies, maternalRelatives } = useAdminBundle();
+  const { update, issues } = useDraft();
+  const { hobbies } = useDraftData();
+  const errorFor = useFieldErrors();
 
-  const addHobby = useAddHobby(biodata.id);
-  const updateHobby = useUpdateHobby(biodata.id);
-  const deleteHobby = useDeleteHobby(biodata.id);
-  const reorderHobbies = useReorderHobbies(biodata.id);
+  const hobbyErrors = useMemo(() => {
+    const map: Record<number, string> = {};
+    for (const issue of issues) {
+      const match = /^hobbies\.(\d+)$/.exec(issue.path);
+      if (match) map[Number(match[1])] = issue.message;
+    }
+    return map;
+  }, [issues]);
 
   return (
-    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
-      <section aria-labelledby="hobbies-title" className="min-w-0">
-        <header className="mb-6">
-          <h1 id="hobbies-title" className="font-display text-2xl font-semibold text-charcoal sm:text-3xl">
-            Hobbies &amp; Interests
-          </h1>
-          <p className="mt-1.5 text-sm text-muted">Add, edit, reorder or remove interests.</p>
-        </header>
-
-        <OrderedListEditor
-          items={hobbies}
-          itemLabel="Hobby"
-          addLabel="Add a hobby"
-          placeholder="e.g. Cricket"
-          emptyMessage="Add the hobbies you would like shown on the biodata."
-          onAdd={(name, displayOrder) => addHobby.mutateAsync({ name, displayOrder })}
-          onUpdate={(id, name) => updateHobby.mutateAsync({ id, name })}
-          onDelete={(id) => deleteHobby.mutateAsync(id)}
-          onReorder={(items) => reorderHobbies.mutateAsync(items)}
-        />
-      </section>
-
-      <LivePreview
-        biodata={biodata}
-        hobbies={hobbies}
-        maternalRelatives={maternalRelatives}
-        focusSection="interests"
-        className="hidden max-h-[calc(100dvh-8rem)] xl:sticky xl:top-24 xl:flex"
+    <EditorPanel
+      title="Hobbies & Interests"
+      description="The chips shown in the Interests section, in this order."
+      footnote="Stored under “hobbies” in data/biodata.json."
+    >
+      <ListEditor
+        items={hobbies}
+        itemLabel="hobby"
+        addLabel="Add hobby"
+        placeholder="Cricket"
+        emptyMessage="No hobbies yet"
+        errors={hobbyErrors}
+        onChange={(next) => update((current) => ({ ...current, hobbies: next }))}
       />
-    </div>
+
+      {errorFor('hobbies') && (
+        <p role="alert" className="mt-2 text-xs font-medium text-danger">
+          {errorFor('hobbies')}
+        </p>
+      )}
+    </EditorPanel>
   );
 }
 

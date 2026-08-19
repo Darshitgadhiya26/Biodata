@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Menu, Share2, X } from 'lucide-react';
 import { useScrollSpy, useScrolled } from '@/hooks/useScrollSpy';
-import { usePrefersReducedMotion } from '@/hooks/useMediaQuery';
+import { useMotionAllowed } from '@/hooks/useTheme';
 import { ThemeToggleButton } from '@/components/ui/ThemeToggle';
 import { cn } from '@/utils/cn';
 
@@ -34,7 +34,7 @@ export function Navbar({ name, onShare }: NavbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const scrolled = useScrolled(16);
   const activeSection = useScrollSpy(SPY_IDS);
-  const reduceMotion = usePrefersReducedMotion();
+  const motionAllowed = useMotionAllowed();
 
   const activeNavId = useMemo(() => {
     const match = NAV_ITEMS.find((item) => (item.covers ?? [item.id]).includes(activeSection));
@@ -68,13 +68,13 @@ export function Navbar({ name, onShare }: NavbarProps) {
 
       // rAF lets the mobile sheet finish closing before we scroll.
       requestAnimationFrame(() => {
-        target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+        target.scrollIntoView({ behavior: motionAllowed ? 'smooth' : 'auto', block: 'start' });
         // Move keyboard focus with the eye.
         target.setAttribute('tabindex', '-1');
         target.focus({ preventScroll: true });
       });
     },
-    [reduceMotion],
+    [motionAllowed],
   );
 
   return (

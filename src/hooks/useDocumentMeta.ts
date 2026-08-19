@@ -22,8 +22,9 @@ function setMeta(selector: string, attribute: 'name' | 'property', key: string, 
 
 /**
  * Keeps <title>, the description, Open Graph tags and the canonical link in
- * step with the data actually loaded from Supabase — so if the name is edited
- * in the dashboard, what gets shared on WhatsApp updates too.
+ * step with the data the app rendered. The same values are baked into
+ * index.html at build time for crawlers that never run JavaScript; this hook
+ * covers client-side navigation and the admin routes.
  */
 export function useDocumentMeta({ title, description, image, canonical }: DocumentMeta): void {
   useEffect(() => {

@@ -3,7 +3,10 @@ import type { Biodata } from '@/types';
 import { Reveal } from './Reveal';
 import { Section } from './Section';
 
+/** Reads `biodata.education`. */
 export function EducationSection({ biodata, still = false }: { biodata: Biodata; still?: boolean }) {
+  const { education } = biodata;
+
   return (
     <Section id="education" eyebrow="Academics" title="Education" still={still} compact={still}>
       <Reveal disabled={still}>
@@ -23,14 +26,14 @@ export function EducationSection({ biodata, still = false }: { biodata: Biodata;
                 Highest Qualification
               </p>
               <h3 className="mt-2 font-display text-2xl font-semibold text-charcoal sm:text-3xl">
-                {biodata.degree || '—'}
+                {education.degree || '—'}
               </h3>
 
               <div aria-hidden className="my-5 h-px w-full bg-gold-line opacity-70" />
 
               <div className="flex items-center justify-center gap-2.5 text-muted sm:justify-start">
                 <School aria-hidden className="h-4 w-4 shrink-0 text-gold" />
-                <p className="text-sm font-medium">{biodata.college || '—'}</p>
+                <p className="text-sm font-medium">{education.college || '—'}</p>
               </div>
             </div>
           </div>

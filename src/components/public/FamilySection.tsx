@@ -4,11 +4,14 @@ import { InfoCard } from './InfoCard';
 import { Reveal } from './Reveal';
 import { Section } from './Section';
 
+/** Reads `biodata.family`. */
 export function FamilySection({ biodata, still = false }: { biodata: Biodata; still?: boolean }) {
+  const { family } = biodata;
+
   const items = [
-    { icon: Users, label: "Father's Name", value: biodata.father_name },
-    { icon: Briefcase, label: "Father's Occupation", value: biodata.father_occupation },
-    { icon: Heart, label: "Mother's Name", value: biodata.mother_name },
+    { icon: Users, label: "Father's Name", value: family.fatherName },
+    { icon: Briefcase, label: "Father's Occupation", value: family.fatherOccupation },
+    { icon: Heart, label: "Mother's Name", value: family.motherName },
   ];
 
   return (

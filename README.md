@@ -1,437 +1,367 @@
 # Darshit Gadhiya — Marriage Biodata
 
-A dynamic, cloud-powered digital marriage biodata.
+A premium, animated, mobile-first digital marriage biodata with a private admin
+dashboard that edits the site's content and publishes it straight to GitHub.
 
-Everything you see on the public page is stored in **Supabase** — Postgres for the
-details, Supabase Storage for the photograph. Edit anything from the admin
-dashboard on any device and the change is live on the public website
-immediately. **No rebuild. No redeploy.**
+**GitHub is the database. Vercel is the host. There is nothing else.**
 
-- **Public page** — `/` · elegant, animated, printable, no login required
-- **Admin login** — `/login`
-- **Admin dashboard** — `/admin` · protected, with a live preview of the public page
+No Supabase, no Firebase, no SQL, no CMS, no separate backend server.
 
 ---
 
-## Table of contents
+## Contents
 
-1. [Tech stack](#1-tech-stack)
-2. [Project structure](#2-project-structure)
-3. [Quick start](#3-quick-start)
-4. [Supabase setup (step by step)](#4-supabase-setup-step-by-step)
-5. [Creating the admin account](#5-creating-the-admin-account)
-6. [Environment variables](#6-environment-variables)
-7. [Running locally](#7-running-locally)
-8. [Deploying to Vercel](#8-deploying-to-vercel)
-9. [Everyday use](#9-everyday-use)
-10. [Security model](#10-security-model)
-11. [Testing checklist](#11-testing-checklist)
-12. [Troubleshooting](#12-troubleshooting)
+- [How it works](#how-it-works)
+- [Project structure](#project-structure)
+- [The data file](#the-data-file)
+- [Install and run locally](#install-and-run-locally)
+- [GitHub setup](#github-setup)
+- [Vercel setup](#vercel-setup)
+- [Using the admin dashboard](#using-the-admin-dashboard)
+- [The serverless API](#the-serverless-api)
+- [Security](#security)
+- [What this is not](#what-this-is-not)
 
 ---
 
-## 1. Tech stack
+## How it works
 
-| Concern | Choice |
-| --- | --- |
-| UI | React 18 + TypeScript |
-| Build | Vite 7 |
-| Styling | Tailwind CSS 3 (custom champagne/ivory design tokens) |
-| Animation | Framer Motion |
-| Icons | Lucide React |
-| Routing | React Router 7 (data router) |
-| Data fetching / cache | TanStack Query 5 |
-| Forms + validation | React Hook Form + Zod |
-| Database / Auth / Storage / Realtime | Supabase |
-| Hosting | Vercel |
+```
+                        GITHUB
+                          │
+                 ┌────────┴────────┐
+                 │                 │
+         data/biodata.json   public/images/profile.jpg
+                 │                 │
+                 └────────┬────────┘
+                          ↓
+                        VERCEL
+                          │
+                 ┌────────┴────────┐
+                 │                 │
+              PUBLIC             ADMIN
+             WEBSITE           DASHBOARD
+                                   │
+                                   ↓
+                            Vercel serverless API
+                                   │
+                                   ↓
+                              GitHub API
+                                   │
+                                   ↓
+                          commit to the repo
+                                   │
+                                   ↓
+                          Vercel redeploys
+```
+
+The public website reads `data/biodata.json`, which is bundled into the site at
+build time — so a visitor gets the content with no database query, no API call
+and no loading spinner.
+
+The admin dashboard edits a **draft** of that same file. Pressing
+**Publish Changes** sends the draft to a Vercel serverless function, which
+validates it and commits it to GitHub. Vercel sees the commit and rebuilds the
+site.
+
+### This is not a real-time database
+
+The update path is:
+
+```
+Edit → Publish → GitHub commit → Vercel build → website updated
+```
+
+The public page changes when the deployment finishes, typically within a minute
+— **not instantly**. The dashboard says so at every step rather than pretending
+otherwise.
 
 ---
 
-## 2. Project structure
+## Project structure
 
 ```
 .
-├── index.html                     # SEO + Open Graph tags, no-flash theme script
-├── vercel.json                    # SPA rewrites, cache + security headers
-├── .env.example                   # Copy to .env
+├── data/
+│   └── biodata.json          ← the single source of truth
+│
 ├── public/
-│   ├── profile-photo.jpg          # Bundled fallback portrait
-│   ├── og-image.jpg               # Social share preview
+│   ├── images/
+│   │   └── profile.jpg       ← the portrait, committed to this repo
+│   ├── og-image.jpg
 │   └── apple-touch-icon.png
-├── supabase/
-│   ├── migrations/
-│   │   ├── 001_create_biodata.sql
-│   │   ├── 002_create_hobbies.sql
-│   │   ├── 003_create_maternal_relatives.sql
-│   │   ├── 004_create_storage_policies.sql
-│   │   └── 005_create_rls_policies.sql
-│   └── seed.sql                   # Initial biodata (from the source PDF)
-└── src/
-    ├── components/
-    │   ├── ui/                    # Button, Field, Toaster, ConfirmDialog, QrCode, States…
-    │   ├── public/                # Hero, sections, Navbar, BiodataView, ShareSection…
-    │   └── admin/                 # BiodataSectionForm, LivePreview, OrderedListEditor…
-    ├── pages/
-    │   ├── PublicBiodataPage.tsx
-    │   ├── LoginPage.tsx
-    │   ├── NotFoundPage.tsx
-    │   └── admin/                 # Dashboard, Personal, Family, Maternal, Education,
-    │                              # Career, Hobbies, Contact, Photo, Settings
-    ├── layouts/AdminLayout.tsx
-    ├── services/                  # biodata / hobbies / maternal / storage / auth
-    ├── hooks/                     # useBiodata, useHobbies, useAuth, useTheme, useToast…
-    ├── lib/                       # supabase client, env, query client, query keys
-    ├── types/                     # database.ts (schema types) + domain types
-    ├── utils/                     # format, image, validation, share, cn
-    ├── data/defaults.ts           # Original PDF values (backs "Reset to default")
-    └── styles/index.css           # Design tokens, dark palette, print stylesheet
+│
+├── api/                      ← Vercel serverless functions (server-side only)
+│   ├── _lib/                 ← shared helpers (not routed: the `_` prefix)
+│   │   ├── auth.ts           ← password check + signed session cookie
+│   │   ├── github.ts         ← minimal GitHub Contents API client
+│   │   └── http.ts           ← request/response helpers
+│   ├── admin/
+│   │   ├── login.ts
+│   │   ├── logout.ts
+│   │   └── session.ts
+│   └── github/
+│       ├── read.ts
+│       ├── update.ts
+│       └── upload-image.ts
+│
+├── src/
+│   ├── components/
+│   │   ├── public/           ← the biodata document itself
+│   │   ├── admin/            ← dashboard shell, editors, live preview
+│   │   └── ui/               ← buttons, fields, toasts, dialogs
+│   ├── pages/
+│   │   ├── PublicBiodataPage.tsx
+│   │   └── admin/            ← one page per section of the JSON
+│   ├── hooks/
+│   ├── utils/
+│   │   └── biodata-schema.ts ← the Zod schema, shared with the API
+│   ├── types/
+│   └── styles/
+│
+├── .env.example
+├── vercel.json
+└── vite.config.ts
 ```
-
-**Architectural rule:** no biodata value is hardcoded in a component. Every field
-is read from Supabase through the service layer and rendered from props.
 
 ---
 
-## 3. Quick start
+## The data file
+
+Everything the public website shows lives in `data/biodata.json`:
+
+```json
+{
+  "personal": {
+    "name": "Darshit Gadhiya",
+    "dateOfBirth": "26-11-2001",
+    "caste": "Leuva Patel",
+    "height": "5 feet 6 inches",
+    "weight": "75 Kg",
+    "bloodGroup": "B+"
+  },
+  "family": { "fatherName": "…", "fatherOccupation": "…", "motherName": "…" },
+  "maternal": { "relatives": ["…"], "address": "…" },
+  "education": { "degree": "…", "college": "…" },
+  "career": { "job": "…", "company": "…", "workLocation": "…" },
+  "hobbies": ["Movies", "Cricket"],
+  "contact": { "phone": "7069306559", "address": "…" },
+  "profilePhoto": "/images/profile.jpg",
+  "theme": { "mode": "light", "accent": "champagne", "animations": true }
+}
+```
+
+Rules the code enforces:
+
+- No component hardcodes a biodata value — every field is read from this file.
+- `dateOfBirth` is `DD-MM-YYYY`, the format used on the printed biodata.
+- `profilePhoto` is a repository path such as `/images/profile.jpg`. Images are
+  **never** stored as base64 inside the JSON.
+- The whole structure is validated with [Zod](https://zod.dev) — in the browser
+  before publishing, and again on the server before committing. A malformed
+  file cannot reach the repository.
+- `theme` sets the site-wide defaults. A visitor who picks a different theme
+  gets a browser-local override; the published default is unchanged.
+
+You can edit the file by hand and commit it. The dashboard is a convenience,
+not a requirement.
+
+---
+
+## Install and run locally
+
+Requires Node 20 or newer.
 
 ```bash
-git clone <your-repo-url>
-cd Biodata
 npm install
-cp .env.example .env      # then fill in your Supabase URL + anon key
-npm run dev               # http://localhost:5173
 ```
 
-You still need a Supabase project — see the next section.
-
----
-
-## 4. Supabase setup (step by step)
-
-### 4.1 Create the project
-
-1. Go to <https://supabase.com/dashboard> and select **New project**.
-2. Name it (e.g. `darshit-biodata`), choose a strong database password, and pick
-   a region close to your visitors (`Mumbai (ap-south-1)` for India).
-3. Wait for provisioning to finish (~2 minutes).
-
-### 4.2 Run the migrations
-
-**Option A — SQL Editor (no tooling required).**
-
-Open **SQL Editor → New query** and run each file's contents **in order**:
-
-1. `supabase/migrations/001_create_biodata.sql`
-2. `supabase/migrations/002_create_hobbies.sql`
-3. `supabase/migrations/003_create_maternal_relatives.sql`
-4. `supabase/migrations/004_create_storage_policies.sql`
-5. `supabase/migrations/005_create_rls_policies.sql`
-
-Then run `supabase/seed.sql` to insert the initial biodata.
-
-**Option B — Supabase CLI.**
+**Development server** (public website; the `/api` routes are not available):
 
 ```bash
-npm install -g supabase
-supabase login
-supabase link --project-ref <your-project-ref>
-supabase db push                 # applies supabase/migrations/*
-psql "$DATABASE_URL" -f supabase/seed.sql
+npm run dev
 ```
 
-> Every migration is idempotent — re-running them is safe.
-
-### 4.3 What the migrations create
-
-**Tables**
-
-| Table | Purpose |
-| --- | --- |
-| `biodata` | The profile: personal, family, education, career, contact, photo URL |
-| `hobbies` | Hobbies & interests (`biodata_id` FK, `display_order`) |
-| `maternal_relatives` | Maternal relatives (`biodata_id` FK, `display_order`) |
-
-UUID primary keys, foreign keys with `ON DELETE CASCADE`, indexes on the
-`(biodata_id, display_order)` read path, and an `updated_at` trigger.
-
-**Storage** — bucket `biodata-assets` (public read, 5 MB limit, only
-`image/jpeg`, `image/png`, `image/webp` accepted). Photos live in Storage;
-only the URL is stored in Postgres.
-
-**Row Level Security** — enabled on all three tables:
-
-| Role | Read | Write |
-| --- | --- | --- |
-| `anon` (visitors) | Published rows only | ❌ Denied by the database |
-| `authenticated` (admin) | Everything | ✅ Insert / update / delete |
-
-**Realtime** — the three tables are added to the `supabase_realtime`
-publication, so an open public page refreshes itself when you save.
-
-### 4.4 Verify the storage bucket
-
-**Storage → Buckets** should list `biodata-assets` as **Public**. If migration
-004 did not create it (some projects restrict `storage.buckets` inserts), create
-it by hand:
-
-- Name: `biodata-assets`
-- Public bucket: **on**
-- File size limit: `5 MB`
-- Allowed MIME types: `image/jpeg, image/png, image/webp`
-
-Then re-run only the policy statements from `004_create_storage_policies.sql`.
-
----
-
-## 5. Creating the admin account
-
-There is **no public sign-up page** — that is deliberate. Create the single
-admin account by hand:
-
-1. Supabase Dashboard → **Authentication → Users → Add user → Create new user**.
-2. Enter the admin email and a strong password.
-3. Tick **Auto Confirm User** (so no confirmation email is needed).
-4. Select **Create user**.
-
-Recommended hardening, under **Authentication → Providers → Email**:
-
-- Turn **Enable email signups** **off** — nobody can self-register.
-- Leave **Email OTP / magic link** off unless you want it.
-
-That account is the only login that works at `/login`.
-
----
-
-## 6. Environment variables
-
-| Variable | Required | Description |
-| --- | --- | --- |
-| `VITE_SUPABASE_URL` | ✅ | Project Settings → API → **Project URL** |
-| `VITE_SUPABASE_ANON_KEY` | ✅ | Project Settings → API → **anon public** key |
-| `VITE_SITE_URL` | Recommended | Canonical public URL — used by the QR code, share sheet and canonical tag |
-
-```bash
-cp .env.example .env
-```
-
-```env
-VITE_SUPABASE_URL=https://xxxxxxxxxxxx.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOi...
-VITE_SITE_URL=https://darshit-biodata.vercel.app
-```
-
-> ⚠️ **Never** put the `service_role` key in a `VITE_*` variable, a `.env`
-> committed to git, or anywhere in this frontend. The anon key is safe to ship:
-> Row Level Security — not secrecy — is what protects the data.
-> `.env` is already in `.gitignore`.
-
----
-
-## 7. Running locally
-
-```bash
-npm install        # install dependencies
-npm run dev        # dev server at http://localhost:5173
-npm run build      # typecheck (tsc -b) + production build to dist/
-npm run preview    # serve the production build locally
-npm run typecheck  # TypeScript only
-```
-
----
-
-## 8. Deploying to Vercel
-
-### 8.1 Import the project
-
-1. Push this repository to GitHub.
-2. Go to <https://vercel.com/new> and import the repository.
-3. Vercel detects Vite automatically. `vercel.json` already pins:
-   - Build command: `npm run build`
-   - Output directory: `dist`
-   - SPA rewrites, so `/admin` and `/login` work on a hard refresh
-   - Long-lived cache headers for hashed assets, plus basic security headers
-
-### 8.2 Add the environment variables
-
-**Project → Settings → Environment Variables**, and add each for
-**Production**, **Preview** *and* **Development**:
-
-| Name | Value |
-| --- | --- |
-| `VITE_SUPABASE_URL` | `https://xxxxxxxxxxxx.supabase.co` |
-| `VITE_SUPABASE_ANON_KEY` | your anon public key |
-| `VITE_SITE_URL` | `https://<your-project>.vercel.app` |
-
-Or from the CLI:
+**With the API**, using the Vercel CLI — this is what you need to try the admin
+dashboard locally. Put your values in a `.env` file first (copy `.env.example`):
 
 ```bash
 npm i -g vercel
-vercel link
-vercel env add VITE_SUPABASE_URL production
-vercel env add VITE_SUPABASE_ANON_KEY production
-vercel env add VITE_SITE_URL production
-vercel --prod
+vercel dev
 ```
 
-### 8.3 Getting your production URL
-
-The first deploy gives you `https://<project>.vercel.app`. Set that as
-`VITE_SITE_URL` and redeploy once so the QR code and share links point at it.
-
-For a custom domain: **Settings → Domains → Add**, follow the DNS instructions,
-then update `VITE_SITE_URL` to the custom domain and redeploy.
-
-> Environment variables are read at **build** time, so changing one needs a
-> redeploy. Changing **biodata** never does — that lives in Supabase.
-
----
-
-## 9. Everyday use
-
-### Changing biodata information
-
-1. Open `https://your-site.vercel.app/login` and sign in.
-2. Pick a section in the sidebar (Personal, Family, Maternal, Education, Career,
-   Hobbies, Contact).
-3. Edit the fields. The **live preview** on the right updates as you type.
-4. Select **Save Changes** → “Changes saved successfully”.
-5. The public website shows the new value immediately, on every device.
-
-Extras: **Cancel** restores the last saved values, **Reset** puts the original
-biodata values back into the form (not saved until you press Save), and leaving
-a page with unsaved edits asks for confirmation.
-
-### Changing the profile photo
-
-1. **Admin → Photo**.
-2. Choose or drag in a JPEG / PNG / WEBP (up to 5 MB). It is validated, resized
-   to max 1200px and compressed **in your browser** before uploading.
-3. Check the preview, then **Save Photo**. A progress bar shows the upload.
-4. The new image is stored in the `biodata-assets` bucket, its public URL is
-   saved to Postgres, and the previous file is deleted automatically.
-
-**Delete uploaded photo** reverts to the portrait bundled with the site.
-
-### Hobbies and maternal relatives
-
-**Admin → Hobbies** / **Admin → Maternal**: add, rename, reorder (↑ / ↓) or
-delete. Each action writes to Supabase straight away — no separate save step.
-
-### Sharing
-
-- **Share Biodata** — native share sheet on mobile, copies the link elsewhere
-- **Copy Link** — clipboard, with a “Link copied!” toast
-- **QR code** — on the public page, and downloadable as a PNG from
-  **Admin → Settings**
-- **Download PDF / Print** — opens the print dialog against a dedicated print
-  stylesheet (choose *Save as PDF* as the destination). Navigation, buttons,
-  toasts and animations are stripped; the photo and all sections are kept.
-
-### Hiding the biodata temporarily
-
-**Admin → Settings → Visibility → Hide from visitors** flips `is_published`.
-Anonymous visitors then see an empty state — enforced by RLS, not by the UI.
-
-### Reset to default
-
-**Admin → Settings → Reset to Default** (with confirmation) restores every
-field, all hobbies and all maternal relatives to the original biodata values in
-`src/data/defaults.ts`. Your uploaded photo is kept.
-
----
-
-## 10. Security model
-
-- **RLS is the boundary, not the UI.** Anonymous users hold the anon key (it is
-  in the bundle — that is expected) and could call PostgREST directly. The
-  policies in `005_create_rls_policies.sql` allow `anon` to `SELECT` published
-  rows and nothing else; every insert/update/delete requires an authenticated
-  session.
-- **Storage is locked the same way.** Public read, writes restricted to
-  `authenticated`, with the MIME allow-list and size cap enforced by the bucket.
-- **No service-role key in the browser.** Only `VITE_SUPABASE_URL`,
-  `VITE_SUPABASE_ANON_KEY` and `VITE_SITE_URL` reach the client, and all three
-  are meant to be public.
-- **No public registration.** One account, created by hand.
-- **`/admin` redirect is a convenience.** `ProtectedRoute` improves the
-  experience; the database is what actually refuses unauthorised writes.
-- **Vague auth errors.** Failed logins say “Incorrect email or password”, never
-  whether the address exists.
-- **Server-side validation too.** `CHECK` constraints and unique indexes back up
-  the Zod schemas in the browser.
-
-Quick proof — this must fail with a row-level-security error:
+**Production build:**
 
 ```bash
-curl -X PATCH "$VITE_SUPABASE_URL/rest/v1/biodata?id=eq.<row-id>" \
-  -H "apikey: $VITE_SUPABASE_ANON_KEY" \
-  -H "Authorization: Bearer $VITE_SUPABASE_ANON_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"hacked"}'
+npm run build     # type-checks the app and the API, then builds
+npm run preview   # serves the built site
+```
+
+**Type-check only:**
+
+```bash
+npm run typecheck
 ```
 
 ---
 
-## 11. Testing checklist
+## GitHub setup
 
-| | Check |
-| --- | --- |
-| ☐ | Public website loads at `/` without logging in |
-| ☐ | All biodata values match the source information |
-| ☐ | Profile photo loads |
-| ☐ | `/admin` redirects to `/login` while signed out |
-| ☐ | Wrong password is rejected; correct password signs in |
-| ☐ | Personal / Family / Maternal / Education / Career / Contact can be edited and saved |
-| ☐ | Live preview updates as you type, before saving |
-| ☐ | Hobbies can be added, edited, reordered and deleted |
-| ☐ | Maternal relatives can be added, edited, reordered and deleted |
-| ☐ | Profile photo can be replaced and deleted |
-| ☐ | Changes persist after a refresh |
-| ☐ | Changes appear in a second browser and on a phone |
-| ☐ | The anon `curl` above is rejected |
-| ☐ | Logout returns you to `/login` |
-| ☐ | Light / Dark / System all look right and the choice persists |
-| ☐ | Mobile navigation opens and scrolls to sections |
-| ☐ | Print / Download PDF produce a clean sheet |
-| ☐ | Share and QR code work |
-| ☐ | `npm run build` succeeds with no TypeScript errors |
-| ☐ | No console errors in the browser |
+1. **Create the repository** (or use this one) and push the project to it.
+   The branch you deploy from is the branch the dashboard commits to.
 
----
+2. **Create a token.** GitHub → *Settings* → *Developer settings* →
+   *Personal access tokens*.
 
-## 12. Troubleshooting
+   **Fine-grained token (recommended)**
+   - *Repository access*: **Only select repositories** → this repository
+   - *Permissions* → *Repository permissions* → **Contents: Read and write**
+   - Nothing else is needed. Do not grant more.
 
-**“This biodata is not connected yet.”**
-`VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` are missing. Add them to `.env`
-(local) or Vercel (deployed) and restart / redeploy.
+   **Classic token**
+   - Scope: `repo`
 
-**“No biodata published yet.”**
-The `biodata` table is empty. Run `supabase/seed.sql`, or sign in to `/admin`
-and use **Create biodata**.
+   Copy the token — GitHub shows it once.
 
-**Saving fails with “You are not allowed to make this change.”**
-Your session expired, or migration 005 was not applied. Sign in again; if it
-persists, re-run `005_create_rls_policies.sql`.
+3. **Note the three values** you will need:
 
-**Photo upload fails.**
-Check the `biodata-assets` bucket exists and is public (§4.4), that the file is
-under 5 MB, and that it is JPEG/PNG/WEBP.
-
-**Public page does not live-update.**
-Realtime needs WebSockets, which some networks block. The page still refetches
-on load, on tab focus and on reconnect — a refresh always shows current data.
-Confirm the tables are in the `supabase_realtime` publication (migration 005).
-
-**`/admin` 404s after deploying.**
-The SPA rewrite in `vercel.json` is missing or was overridden. Ensure
-`vercel.json` is committed at the repository root.
-
-**QR code points at localhost.**
-`VITE_SITE_URL` was not set at build time. Set it in Vercel and redeploy.
+   | Value           | Where it comes from                                  |
+   | --------------- | ---------------------------------------------------- |
+   | `GITHUB_OWNER`  | the account or organisation — the part before the `/` in the repo URL |
+   | `GITHUB_REPO`   | the repository name — the part after the `/`         |
+   | `GITHUB_BRANCH` | the deployed branch, usually `main`                  |
 
 ---
 
-## Credits
+## Vercel setup
 
-Initial biodata content is taken verbatim from the source biodata document.
-Nothing was invented — fields absent from the source are left empty.
+1. **Import the repository** at [vercel.com/new](https://vercel.com/new).
+   Vercel detects Vite; the settings in `vercel.json` do the rest. The
+   functions in `api/` are deployed automatically.
+
+2. **Add the environment variables** in *Settings → Environment Variables*, for
+   **Production, Preview and Development**:
+
+   | Name              | Example / notes                                    |
+   | ----------------- | -------------------------------------------------- |
+   | `GITHUB_TOKEN`    | the token from the previous step                    |
+   | `GITHUB_OWNER`    | `darshitgadhiya26`                                  |
+   | `GITHUB_REPO`     | `biodata`                                           |
+   | `GITHUB_BRANCH`   | `main`                                              |
+   | `ADMIN_PASSWORD`  | a long, random passphrase                           |
+
+   None of these has a `VITE_` prefix, and none of them ever should: Vite only
+   exposes `VITE_*` variables to the browser, so the missing prefix is exactly
+   what keeps these secret.
+
+3. **Deploy.** After changing an environment variable, redeploy so the
+   functions pick it up.
+
+The sign-in page tells you if any of these is missing, by name.
+
+---
+
+## Using the admin dashboard
+
+Open `/admin` on your deployed site and enter `ADMIN_PASSWORD`.
+
+The dashboard has one page per part of the JSON:
+
+**Dashboard · Personal · Family · Maternal · Education · Career · Hobbies ·
+Contact · Profile Photo · Appearance**
+
+On a wide screen the editor sits on the left and a **live preview** on the
+right, rendered with the same components as the public page — what you see is
+what visitors get. On a phone, use **Preview** for a full-screen look.
+
+### Draft, then publish
+
+| Action                 | What it does                                                        |
+| ---------------------- | ------------------------------------------------------------------- |
+| *(typing)*             | Updates the draft and the preview. Nothing is committed.             |
+| **Save Draft Locally** | Keeps the unpublished draft in this browser so a refresh is safe.    |
+| **Preview**            | Full-page view of the draft.                                         |
+| **Cancel**             | Throws the draft away and returns to what GitHub holds.              |
+| **Publish Changes**    | Validates, commits `data/biodata.json`, and Vercel redeploys.        |
+
+`localStorage` is only ever a scratchpad for unpublished typing. **GitHub is
+the source of truth** — the dashboard re-reads the file from the repository
+every time it loads.
+
+### Version safety
+
+The editor remembers the file's git SHA from when it loaded. Publishing sends
+that SHA, and the server refuses the commit if the file has moved on since —
+for instance because you edited it directly on github.com, or from another
+device. You get:
+
+> The biodata was changed elsewhere. Please reload the latest version before
+> publishing.
+
+…and a **Reload latest** button. Nobody's edit is silently overwritten.
+
+### Profile photo
+
+*Profile Photo* → **Choose File** → **Publish Photo**.
+
+JPG, JPEG, PNG and WEBP are accepted. The image is resized and re-encoded in
+your browser first, then committed to `public/images/`. The server checks the
+actual bytes, not just the file name, and rejects anything over 3 MB. If the
+format changes the path changes too (`profile.png` instead of `profile.jpg`),
+and the dashboard updates `profilePhoto` in the draft for you — publish once
+more to save it.
+
+---
+
+## The serverless API
+
+Six routes, all under `/api`. Everything except login, logout and the session
+check requires a valid session cookie.
+
+| Route                      | Method | Purpose                                                 |
+| -------------------------- | ------ | ------------------------------------------------------- |
+| `/api/admin/login`         | POST   | Checks the password, sets the session cookie             |
+| `/api/admin/logout`        | POST   | Clears the cookie                                        |
+| `/api/admin/session`       | GET    | Is the cookie still valid? Is the server configured?     |
+| `/api/github/read`         | GET    | The live `biodata.json` from GitHub, plus its SHA        |
+| `/api/github/update`       | POST   | Validates and commits `data/biodata.json`                |
+| `/api/github/upload-image` | POST   | Commits an image to `public/images/`                     |
+
+`/api/github/update` in order: verify the session → validate against the Zod
+schema → compare the caller's SHA against GitHub's → commit. Any step failing
+means no commit.
+
+---
+
+## Security
+
+- `GITHUB_TOKEN` and `ADMIN_PASSWORD` exist **only** as Vercel environment
+  variables, read only inside `api/`. They are never sent to the browser, never
+  prefixed with `VITE_`, never written to `biodata.json`, and never committed.
+  The built bundle contains neither of them — nor even GitHub's API URL.
+- The session is an HMAC-signed, **HttpOnly**, `SameSite=Strict`, `Secure`
+  cookie that expires after 8 hours. Page JavaScript cannot read it. The
+  signing key is derived from `ADMIN_PASSWORD`, so changing the password
+  invalidates every existing session.
+- The password comparison is constant-time, with a random delay and a
+  per-IP attempt limit on top.
+- Hiding the admin UI is convenience, not the boundary: every `/api/github/*`
+  route verifies the session itself before touching the repository.
+- `.env` is git-ignored. Only `.env.example`, which holds no values, is
+  committed.
+
+If a token is ever exposed, revoke it on GitHub and issue a new one — that is
+the whole recovery procedure.
+
+---
+
+## What this is not
+
+- Not a real-time database. Published changes appear after the Vercel build.
+- Not multi-user. One password, one editor at a time — with SHA conflict
+  detection for when that assumption breaks.
+- Not a general CMS. It edits exactly one JSON file, on purpose.
+
+## Licence
+
+Personal project. All biodata content belongs to Darshit Gadhiya.

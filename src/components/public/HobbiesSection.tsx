@@ -1,14 +1,16 @@
 import { motion } from 'framer-motion';
 import { Sparkles } from 'lucide-react';
-import type { Hobby } from '@/types';
-import { usePrefersReducedMotion } from '@/hooks/useMediaQuery';
+import type { Biodata } from '@/types';
+import { useMotionAllowed } from '@/hooks/useTheme';
 import { EmptyState } from '@/components/ui/States';
 import { Reveal, staggerContainer, staggerItem } from './Reveal';
 import { Section } from './Section';
 
-export function HobbiesSection({ hobbies, still = false }: { hobbies: Hobby[]; still?: boolean }) {
-  const reduceMotion = usePrefersReducedMotion();
-  const animate = !still && !reduceMotion;
+/** Reads `biodata.hobbies` — an ordered list the admin controls. */
+export function HobbiesSection({ biodata, still = false }: { biodata: Biodata; still?: boolean }) {
+  const motionAllowed = useMotionAllowed();
+  const animate = !still && motionAllowed;
+  const { hobbies } = biodata;
 
   return (
     <Section id="interests" eyebrow="Beyond Work" title="Hobbies & Interests" still={still} compact={still}>
@@ -29,9 +31,9 @@ export function HobbiesSection({ hobbies, still = false }: { hobbies: Hobby[]; s
           viewport={{ once: true, margin: '-60px' }}
           className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-3 sm:gap-4"
         >
-          {hobbies.map((hobby) => (
+          {hobbies.map((hobby, index) => (
             <motion.li
-              key={hobby.id}
+              key={`${hobby}-${index}`}
               variants={animate ? staggerItem : undefined}
               whileHover={animate ? { y: -4, scale: 1.03 } : undefined}
               transition={{ type: 'spring', stiffness: 320, damping: 22 }}
@@ -41,7 +43,7 @@ export function HobbiesSection({ hobbies, still = false }: { hobbies: Hobby[]; s
                 aria-hidden
                 className="h-3.5 w-3.5 text-gold transition-transform duration-300 group-hover:rotate-12"
               />
-              <span className="text-sm font-medium text-charcoal">{hobby.name}</span>
+              <span className="text-sm font-medium text-charcoal">{hobby}</span>
             </motion.li>
           ))}
         </motion.ul>

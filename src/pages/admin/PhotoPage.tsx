@@ -1,293 +1,211 @@
 import { useEffect, useRef, useState } from 'react';
-import { Image as ImageIcon, Save, Trash2, Upload, X } from 'lucide-react';
-import { motion } from 'framer-motion';
-import { useAdminBundle } from '@/layouts/AdminLayout';
-import { useUpdateBiodata } from '@/hooks/useBiodata';
+import { Camera, CheckCircle2, GitCommit, ImageUp, UploadCloud } from 'lucide-react';
+import { useDraft, useDraftData } from '@/hooks/useDraft';
 import { useToast } from '@/hooks/useToast';
-import { errorMessage } from '@/services/errors';
-import { deleteProfilePhotoQuietly, uploadProfilePhoto } from '@/services/storageService';
+import { errorMessage, uploadProfileImage } from '@/utils/api';
+import { formatBytes } from '@/utils/format';
 import {
   ACCEPTED_IMAGE_EXTENSIONS,
   ImageValidationError,
   processImageForUpload,
   type ProcessedImage,
 } from '@/utils/image';
-import { formatBytes } from '@/utils/format';
-import { DEFAULT_PROFILE_PHOTO_URL } from '@/data/defaults';
+import { EditorPanel } from '@/components/admin/EditorPanel';
 import { Button } from '@/components/ui/Button';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ProfilePhoto } from '@/components/public/ProfilePhoto';
 
 /**
- * Profile photo management: preview before upload, real upload progress,
- * replace, and delete. Images are compressed in the browser first; only the
- * resulting public Storage URL is written to Postgres — never the bytes.
+ * Commits a new portrait to `public/images/` and points `profilePhoto` at it.
+ *
+ * The image is resized in the browser first, then sent to
+ * `/api/github/upload-image`, which is the only thing that ever touches the
+ * repository. Images are never embedded in biodata.json — only the path is.
  */
 export function PhotoPage() {
-  const { biodata } = useAdminBundle();
+  const { update, saved } = useDraft();
+  const biodata = useDraftData();
   const toast = useToast();
-  const updateBiodata = useUpdateBiodata();
 
   const inputRef = useRef<HTMLInputElement>(null);
   const [selected, setSelected] = useState<ProcessedImage | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [progress, setProgress] = useState<number | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [dragActive, setDragActive] = useState(false);
+  const [committed, setCommitted] = useState<{ path: string; commitUrl: string | null } | null>(null);
 
-  // Object URLs must be released or the tab leaks memory on repeated picks.
+  // Object URLs must be released or they leak for the life of the tab.
   useEffect(() => {
     return () => {
       if (selected) URL.revokeObjectURL(selected.previewUrl);
     };
   }, [selected]);
 
-  const clearSelection = () => {
-    if (selected) URL.revokeObjectURL(selected.previewUrl);
-    setSelected(null);
-    setProgress(null);
-    if (inputRef.current) inputRef.current.value = '';
-  };
-
-  const handleFile = async (file: File | undefined) => {
+  const handleChoose = async (file: File | undefined) => {
     if (!file) return;
+    setCommitted(null);
 
-    setIsProcessing(true);
     try {
       const processed = await processImageForUpload(file);
-      if (selected) URL.revokeObjectURL(selected.previewUrl);
-      setSelected(processed);
+      setSelected((previous) => {
+        if (previous) URL.revokeObjectURL(previous.previewUrl);
+        return processed;
+      });
     } catch (error) {
-      const message =
-        error instanceof ImageValidationError ? error.message : errorMessage(error, 'Could not read that image.');
-      toast.error('That image cannot be used', message);
+      if (error instanceof ImageValidationError) {
+        toast.error('That image cannot be used.', error.message);
+      } else {
+        toast.error('That image could not be read.', errorMessage(error));
+      }
       if (inputRef.current) inputRef.current.value = '';
-    } finally {
-      setIsProcessing(false);
     }
   };
 
-  const handleSave = async () => {
+  const handlePublishPhoto = async () => {
     if (!selected) return;
-
     setIsUploading(true);
-    setProgress(0);
-    const previousPath = biodata.profile_photo_path;
 
     try {
-      const uploaded = await uploadProfilePhoto(selected.file, setProgress);
+      const result = await uploadProfileImage(selected.file);
 
-      await updateBiodata.mutateAsync({
-        id: biodata.id,
-        patch: { profile_photo_url: uploaded.publicUrl, profile_photo_path: uploaded.path },
-      });
+      // Point the draft at the committed file. When the path is unchanged the
+      // JSON needs no edit at all — the new image is already live-on-rebuild.
+      update((current) => ({ ...current, profilePhoto: result.profilePhoto }));
+      setCommitted({ path: result.profilePhoto, commitUrl: result.commitUrl });
 
-      // Only remove the old object once the new URL is safely persisted.
-      await deleteProfilePhotoQuietly(previousPath);
+      URL.revokeObjectURL(selected.previewUrl);
+      setSelected(null);
+      if (inputRef.current) inputRef.current.value = '';
 
-      clearSelection();
-      toast.success('Changes saved successfully', 'The new photo is live on the public website.');
+      toast.success('Photo committed to GitHub.', 'Vercel is deploying the updated website.');
     } catch (error) {
-      toast.error('Unable to save changes. Please try again.', errorMessage(error));
+      toast.error('The photo could not be published.', errorMessage(error));
     } finally {
       setIsUploading(false);
-      setProgress(null);
     }
   };
 
-  const handleDelete = async () => {
-    setIsDeleting(true);
-    const previousPath = biodata.profile_photo_path;
-
-    try {
-      await updateBiodata.mutateAsync({
-        id: biodata.id,
-        // Fall back to the photo bundled with the app rather than leaving a gap.
-        patch: { profile_photo_url: DEFAULT_PROFILE_PHOTO_URL, profile_photo_path: null },
-      });
-      await deleteProfilePhotoQuietly(previousPath);
-
-      setConfirmDelete(false);
-      toast.success('Photo removed', 'The original bundled photo is shown again.');
-    } catch (error) {
-      toast.error('Unable to delete the photo. Please try again.', errorMessage(error));
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  const isBusy = isUploading || isProcessing || isDeleting;
+  const pathChanged = committed !== null && saved?.profilePhoto !== committed.path;
 
   return (
-    <div className="mx-auto max-w-4xl">
-      <header className="mb-6">
-        <h1 className="font-display text-2xl font-semibold text-charcoal sm:text-3xl">Profile Photo</h1>
-        <p className="mt-1.5 text-sm text-muted">
-          JPEG, PNG or WEBP up to 5 MB. Large images are resized and compressed automatically before upload.
-        </p>
-      </header>
-
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+    <EditorPanel
+      title="Profile Photo"
+      description="The portrait at the top of the biodata."
+      footnote="Committed to public/images/ in the repository. Only its path is stored in data/biodata.json — never the image itself."
+    >
+      <div className="space-y-7">
         {/* ---- Current ---- */}
-        <section className="rounded-3xl border border-line bg-surface-raised p-6 text-center shadow-card">
-          <h2 className="text-[0.68rem] font-medium uppercase tracking-wideish text-subtle">
-            Current Profile Photo
-          </h2>
-
-          <div className="mt-6 flex justify-center">
-            <ProfilePhoto src={biodata.profile_photo_url} name={biodata.name} size="md" still />
+        <div>
+          <h2 className="mb-3 text-sm font-semibold text-charcoal">Current photo</h2>
+          <div className="flex flex-col items-center gap-4 rounded-2xl border border-line bg-surface p-5 sm:flex-row sm:items-center">
+            <ProfilePhoto src={biodata.profilePhoto} name={biodata.personal.name} size="sm" still />
+            <div className="min-w-0 text-center sm:text-left">
+              <p className="break-all font-mono text-xs text-muted">{biodata.profilePhoto}</p>
+              <p className="mt-1 text-xs text-subtle">Served from the repository's public folder.</p>
+            </div>
           </div>
+        </div>
 
-          <p className="mt-6 break-all text-[0.7rem] text-subtle">
-            {biodata.profile_photo_url ?? 'No photo set'}
-          </p>
+        {/* ---- Choose ---- */}
+        <div>
+          <h2 className="mb-3 text-sm font-semibold text-charcoal">Upload a new photo</h2>
 
-          <Button
-            variant="secondary"
-            size="sm"
-            className="mt-4"
-            leadingIcon={<Trash2 className="h-3.5 w-3.5" />}
-            onClick={() => setConfirmDelete(true)}
-            disabled={isBusy || !biodata.profile_photo_path}
-          >
-            Delete uploaded photo
-          </Button>
+          <label className="flex cursor-pointer flex-col items-center gap-2 rounded-2xl border border-dashed border-line bg-surface px-5 py-8 text-center transition-colors hover:border-gold/60">
+            <span aria-hidden className="flex h-11 w-11 items-center justify-center rounded-full bg-gold/10 text-gold">
+              <ImageUp className="h-5 w-5" />
+            </span>
+            <span className="text-sm font-medium text-charcoal">Choose File</span>
+            <span className="text-xs text-subtle">JPG, JPEG, PNG or WEBP · resized automatically before upload</span>
+            <input
+              ref={inputRef}
+              type="file"
+              accept={ACCEPTED_IMAGE_EXTENSIONS}
+              className="sr-only"
+              onChange={(event) => void handleChoose(event.target.files?.[0])}
+            />
+          </label>
+        </div>
 
-          {!biodata.profile_photo_path && (
-            <p className="mt-2 text-[0.7rem] text-subtle">Currently using the photo bundled with the site.</p>
-          )}
-        </section>
+        {/* ---- Preview + publish ---- */}
+        {selected && (
+          <div className="rounded-2xl border border-gold/40 bg-gold/5 p-5">
+            <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-charcoal">
+              <Camera aria-hidden className="h-4 w-4 text-gold" />
+              Preview
+            </h2>
 
-        {/* ---- Upload ---- */}
-        <section className="rounded-3xl border border-line bg-surface-raised p-6 shadow-card">
-          <h2 className="text-[0.68rem] font-medium uppercase tracking-wideish text-subtle">Upload New Photo</h2>
+            <div className="flex flex-col items-center gap-4 sm:flex-row">
+              <ProfilePhoto src={selected.previewUrl} name={biodata.personal.name} size="sm" still />
 
-          <input
-            ref={inputRef}
-            type="file"
-            accept={ACCEPTED_IMAGE_EXTENSIONS}
-            className="sr-only"
-            id="photo-input"
-            onChange={(event) => void handleFile(event.target.files?.[0])}
-            disabled={isBusy}
-          />
-
-          {selected ? (
-            <div className="mt-5">
-              <div className="flex justify-center">
-                <ProfilePhoto src={selected.previewUrl} name="New photo preview" size="md" still />
-              </div>
-
-              <dl className="mt-5 space-y-1 text-center text-xs text-muted">
-                <div>
-                  <dt className="sr-only">Dimensions</dt>
-                  <dd>
-                    {selected.width} × {selected.height} px
-                  </dd>
-                </div>
-                <div>
-                  <dt className="sr-only">Size</dt>
-                  <dd>
-                    {formatBytes(selected.bytes)}
-                    {selected.bytes < selected.originalBytes && (
-                      <span className="text-success">
-                        {' '}
-                        (compressed from {formatBytes(selected.originalBytes)})
-                      </span>
-                    )}
-                  </dd>
-                </div>
-              </dl>
-
-              {progress !== null && (
-                <div className="mt-5">
-                  <div
-                    role="progressbar"
-                    aria-valuenow={progress}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-label="Upload progress"
-                    className="h-2 w-full overflow-hidden rounded-full bg-line"
-                  >
-                    <motion.div
-                      className="h-full rounded-full bg-gradient-to-r from-gold-soft to-gold"
-                      initial={{ width: 0 }}
-                      animate={{ width: `${progress}%` }}
-                      transition={{ duration: 0.25 }}
-                    />
-                  </div>
-                  <p className="mt-1.5 text-center text-xs text-muted">Uploading… {progress}%</p>
-                </div>
-              )}
-
-              <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-                <Button
-                  variant="gold"
-                  fullWidth
-                  leadingIcon={<Save className="h-4 w-4" />}
-                  onClick={() => void handleSave()}
-                  isLoading={isUploading}
-                  loadingText="Uploading…"
-                >
-                  Save Photo
-                </Button>
-                <Button
-                  variant="secondary"
-                  fullWidth
-                  leadingIcon={<X className="h-4 w-4" />}
-                  onClick={clearSelection}
-                  disabled={isUploading}
-                >
-                  Cancel
-                </Button>
+              <div className="min-w-0 text-center sm:text-left">
+                <p className="text-sm text-charcoal">
+                  {selected.width} × {selected.height} px · {formatBytes(selected.bytes)}
+                </p>
+                {selected.bytes < selected.originalBytes && (
+                  <p className="mt-1 text-xs text-muted">
+                    Compressed from {formatBytes(selected.originalBytes)} before upload.
+                  </p>
+                )}
               </div>
             </div>
-          ) : (
-            <label
-              htmlFor="photo-input"
-              onDragOver={(event) => {
-                event.preventDefault();
-                setDragActive(true);
-              }}
-              onDragLeave={() => setDragActive(false)}
-              onDrop={(event) => {
-                event.preventDefault();
-                setDragActive(false);
-                void handleFile(event.dataTransfer.files?.[0]);
-              }}
-              className={`mt-5 flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed p-8 text-center transition-colors ${
-                dragActive ? 'border-gold bg-gold/5' : 'border-line hover:border-gold/60 hover:bg-gold/[0.03]'
-              }`}
-            >
-              <span
-                aria-hidden
-                className="flex h-12 w-12 items-center justify-center rounded-full bg-gold/10 text-gold"
+
+            <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+              <Button
+                variant="gold"
+                onClick={() => void handlePublishPhoto()}
+                isLoading={isUploading}
+                loadingText="Publishing…"
+                leadingIcon={<UploadCloud className="h-4 w-4" />}
               >
-                {isProcessing ? <ImageIcon className="h-5 w-5 animate-pulse" /> : <Upload className="h-5 w-5" />}
-              </span>
+                Publish Photo
+              </Button>
 
-              <span className="text-sm font-medium text-charcoal">
-                {isProcessing ? 'Preparing image…' : 'Choose or drop an image'}
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  URL.revokeObjectURL(selected.previewUrl);
+                  setSelected(null);
+                  if (inputRef.current) inputRef.current.value = '';
+                }}
+                disabled={isUploading}
+              >
+                Cancel
+              </Button>
+            </div>
+
+            <p className="mt-3 text-xs leading-relaxed text-muted">
+              Publishing the photo commits the image to GitHub straight away and starts a Vercel deployment.
+            </p>
+          </div>
+        )}
+
+        {/* ---- Result ---- */}
+        {committed && (
+          <div role="status" className="rounded-2xl border border-success/40 bg-success/5 p-4 text-sm text-charcoal">
+            <p className="flex items-start gap-2.5">
+              <CheckCircle2 aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+              <span>
+                <strong className="font-semibold">Photo published to {committed.path}.</strong>{' '}
+                {pathChanged
+                  ? 'The image format changed, so the path in biodata.json changed too — use “Publish Changes” below to save it.'
+                  : 'Vercel is deploying the updated website.'}
+                {committed.commitUrl && (
+                  <>
+                    {' '}
+                    <a
+                      href={committed.commitUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 font-medium text-gold underline-offset-4 hover:underline"
+                    >
+                      <GitCommit aria-hidden className="h-3.5 w-3.5" />
+                      View the commit
+                    </a>
+                  </>
+                )}
               </span>
-              <span className="text-xs text-subtle">JPEG, PNG or WEBP · up to 5 MB</span>
-            </label>
-          )}
-        </section>
+            </p>
+          </div>
+        )}
       </div>
-
-      <ConfirmDialog
-        open={confirmDelete}
-        destructive
-        title="Delete the uploaded photo?"
-        description="The biodata will fall back to the photo bundled with the site. You can upload a new one at any time."
-        confirmLabel="Delete photo"
-        isBusy={isDeleting}
-        onConfirm={() => void handleDelete()}
-        onCancel={() => setConfirmDelete(false)}
-      />
-    </div>
+    </EditorPanel>
   );
 }
 

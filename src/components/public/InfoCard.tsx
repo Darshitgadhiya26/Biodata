@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import type { LucideIcon } from 'lucide-react';
-import { usePrefersReducedMotion } from '@/hooks/useMediaQuery';
+import { useMotionAllowed } from '@/hooks/useTheme';
 import { cn } from '@/utils/cn';
 
 interface InfoCardProps {
@@ -20,13 +20,13 @@ interface InfoCardProps {
  * layout never collapses and nothing is invented to fill the gap.
  */
 export function InfoCard({ icon: Icon, label, value, lines, className, still, emphasis }: InfoCardProps) {
-  const reduceMotion = usePrefersReducedMotion();
+  const motionAllowed = useMotionAllowed();
   const hasLines = Array.isArray(lines) && lines.length > 0;
   const isEmpty = !hasLines && !value;
 
   return (
     <motion.div
-      whileHover={still || reduceMotion ? undefined : { y: -3 }}
+      whileHover={still || !motionAllowed ? undefined : { y: -3 }}
       transition={{ type: 'spring', stiffness: 300, damping: 24 }}
       className={cn(
         'group relative flex gap-4 overflow-hidden rounded-2xl border border-line bg-surface-raised p-5 shadow-card transition-shadow duration-300 hover:shadow-card-hover print-block',

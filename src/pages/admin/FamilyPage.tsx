@@ -1,27 +1,53 @@
-import { useAdminBundle } from '@/layouts/AdminLayout';
-import { BiodataSectionForm, type FieldDefinition } from '@/components/admin/BiodataSectionForm';
-import { familySchema } from '@/utils/validation';
+import { useDraft, useDraftData, useFieldErrors } from '@/hooks/useDraft';
+import { EditorPanel } from '@/components/admin/EditorPanel';
+import { TextField } from '@/components/ui/Field';
 
-const FIELDS: FieldDefinition[] = [
-  { name: 'father_name', label: "Father's Name", placeholder: 'Full name' },
-  { name: 'father_occupation', label: "Father's Occupation", placeholder: 'e.g. Agriculture (27 Vigha)' },
-  { name: 'mother_name', label: "Mother's Name", placeholder: 'Full name' },
-];
-
+/** Edits `family` in `data/biodata.json`. */
 export function FamilyPage() {
-  const { biodata, hobbies, maternalRelatives } = useAdminBundle();
+  const { update } = useDraft();
+  const { family } = useDraftData();
+  const errorFor = useFieldErrors();
+
+  const set = (field: keyof typeof family, value: string) =>
+    update((current) => ({ ...current, family: { ...current.family, [field]: value } }));
 
   return (
-    <BiodataSectionForm
-      biodata={biodata}
-      hobbies={hobbies}
-      maternalRelatives={maternalRelatives}
+    <EditorPanel
       title="Family Details"
-      description="Parents' names and occupation."
-      fields={FIELDS}
-      schema={familySchema}
-      previewSection="family"
-    />
+      description="Parents' names and your father's occupation."
+      footnote="Stored under “family” in data/biodata.json."
+    >
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <TextField
+          label="Father's name"
+          name="fatherName"
+          required
+          value={family.fatherName}
+          onChange={(event) => set('fatherName', event.target.value)}
+          error={errorFor('family.fatherName')}
+          containerClassName="sm:col-span-2"
+        />
+
+        <TextField
+          label="Father's occupation"
+          name="fatherOccupation"
+          required
+          value={family.fatherOccupation}
+          onChange={(event) => set('fatherOccupation', event.target.value)}
+          placeholder="Agriculture (27 Vigha)"
+          error={errorFor('family.fatherOccupation')}
+        />
+
+        <TextField
+          label="Mother's name"
+          name="motherName"
+          required
+          value={family.motherName}
+          onChange={(event) => set('motherName', event.target.value)}
+          error={errorFor('family.motherName')}
+        />
+      </div>
+    </EditorPanel>
   );
 }
 

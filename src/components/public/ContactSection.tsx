@@ -4,9 +4,10 @@ import { formatPhone, telHref, toLines } from '@/utils/format';
 import { Reveal } from './Reveal';
 import { Section } from './Section';
 
+/** Reads `biodata.contact`. On a phone, "Call Now" is the primary action. */
 export function ContactSection({ biodata, still = false }: { biodata: Biodata; still?: boolean }) {
-  const addressLines = toLines(biodata.address);
-  const phone = biodata.phone;
+  const { phone, address } = biodata.contact;
+  const addressLines = toLines(address);
 
   return (
     <Section
