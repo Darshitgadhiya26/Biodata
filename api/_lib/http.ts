@@ -44,25 +44,33 @@ export function rejectMethod(req: VercelRequest, res: VercelResponse, allowed: s
 }
 
 /**
- * Parses the JSON body defensively. Vercel usually parses it for us, but a
- * string body arrives when the content type is unusual.
+ * Parses the JSON body defensively.
+ *
+ * Vercel usually hands us a parsed object, but a string or a raw Buffer
+ * arrives when the content type is missing or unrecognised — for instance if a
+ * proxy strips the header. All three are handled so a valid request is never
+ * rejected on a technicality.
  */
 export function readJsonBody(req: VercelRequest): Record<string, unknown> | null {
   const { body } = req;
 
   if (body === undefined || body === null || body === '') return null;
 
-  if (typeof body === 'string') {
+  const asObject = (value: unknown): Record<string, unknown> | null =>
+    typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : null;
+
+  const parse = (text: string): Record<string, unknown> | null => {
     try {
-      const parsed: unknown = JSON.parse(body);
-      return typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : null;
+      return asObject(JSON.parse(text));
     } catch {
       return null;
     }
-  }
+  };
 
-  if (typeof body === 'object') return body as Record<string, unknown>;
-  return null;
+  if (typeof body === 'string') return parse(body);
+  if (Buffer.isBuffer(body)) return parse(body.toString('utf8'));
+
+  return asObject(body);
 }
 
 /** Reads a required server-side environment variable. */
