@@ -9,9 +9,9 @@
  * expected to write that new path into `profilePhoto`.
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { isAuthenticated } from '../_lib/auth';
-import { applySecurityHeaders, describeError, fail, json, readJsonBody, rejectMethod } from '../_lib/http';
-import { GitHubError, IMAGE_DIR, readFileSha, readRepoConfig, writeFile } from '../_lib/github';
+import { isAuthenticated } from '../_lib/auth.js';
+import { applySecurityHeaders, describeError, fail, json, readJsonBody, rejectMethod } from '../_lib/http.js';
+import { GitHubError, IMAGE_DIR, readFileSha, readRepoConfig, writeFile } from '../_lib/github.js';
 
 /** Kept well under Vercel's 4.5 MB request limit once base64 inflation is counted. */
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;

@@ -9,9 +9,47 @@
 import { ApiError, type Biodata, type BiodataFile, type FieldIssue, type PublishResult } from '@/types';
 
 interface ErrorPayload {
-  error?: string;
+  /**
+   * Our own routes send a string. Vercel's platform errors (a crashed
+   * function, a timeout) send an object like
+   * `{ error: { code, message } }` instead — which is why this is `unknown`
+   * and gets narrowed below rather than trusted.
+   */
+  error?: unknown;
   code?: string;
   issues?: FieldIssue[];
+}
+
+/**
+ * Pulls a human-readable message out of an error body of unknown shape.
+ * Never returns an object, so `[object Object]` can never reach the UI.
+ */
+function extractMessage(payload: unknown, status: number): { message: string; code?: string } {
+  const fallback = `The server returned an unexpected error (HTTP ${status}).`;
+
+  if (typeof payload !== 'object' || payload === null) return { message: fallback };
+
+  const body = payload as ErrorPayload;
+  const { error } = body;
+
+  if (typeof error === 'string' && error.trim()) {
+    return { message: error, code: body.code };
+  }
+
+  // Vercel's shape: { error: { code, message } }
+  if (typeof error === 'object' && error !== null) {
+    const nested = error as { message?: unknown; code?: unknown };
+    const message = typeof nested.message === 'string' && nested.message.trim() ? nested.message : fallback;
+    const code = typeof nested.code === 'string' ? nested.code : body.code;
+    return { message, code };
+  }
+
+  return { message: fallback, code: body.code };
+}
+
+/** True when the body is one of our own `{ error, code }` responses. */
+function isOwnError(payload: unknown): boolean {
+  return typeof payload === 'object' && payload !== null && typeof (payload as ErrorPayload).error === 'string';
 }
 
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -45,12 +83,18 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 
   if (!response.ok) {
-    const body = (payload ?? {}) as ErrorPayload;
-    throw new ApiError(body.error ?? `Request failed with status ${response.status}.`, {
-      status: response.status,
-      code: body.code,
-      issues: body.issues,
-    });
+    const { message, code } = extractMessage(payload, response.status);
+    const issues = (payload as ErrorPayload | null)?.issues;
+
+    // A 500 from one of our own routes is already explanatory; a 500 with no
+    // usable body means the function itself failed to start, which the admin
+    // can only fix by looking at the deployment.
+    const detail =
+      code === 'FUNCTION_INVOCATION_FAILED' || (response.status >= 500 && !isOwnError(payload))
+        ? `${message.replace(/[\s.]+$/, '')}. The /api routes may not have deployed correctly — check the Vercel deployment logs.`
+        : message;
+
+    throw new ApiError(detail, { status: response.status, code, issues });
   }
 
   return payload as T;

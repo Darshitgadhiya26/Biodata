@@ -7,8 +7,8 @@
  * publish time into a clear message at login time.
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { isAuthenticated } from '../_lib/auth';
-import { applySecurityHeaders, json, rejectMethod } from '../_lib/http';
+import { isAuthenticated } from '../_lib/auth.js';
+import { applySecurityHeaders, json, rejectMethod } from '../_lib/http.js';
 
 const REQUIRED = ['ADMIN_PASSWORD', 'GITHUB_TOKEN', 'GITHUB_OWNER', 'GITHUB_REPO'] as const;
 

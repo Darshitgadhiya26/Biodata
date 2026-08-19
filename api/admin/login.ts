@@ -15,8 +15,8 @@ import {
   recordFailedAttempt,
   setSessionCookie,
   SESSION_TTL_SECONDS,
-} from '../_lib/auth';
-import { applySecurityHeaders, describeError, fail, json, readJsonBody, rejectMethod } from '../_lib/http';
+} from '../_lib/auth.js';
+import { applySecurityHeaders, describeError, fail, json, readJsonBody, rejectMethod } from '../_lib/http.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   applySecurityHeaders(res);
