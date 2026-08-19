@@ -1,4 +1,4 @@
-import { getPublicBiodataUrl } from '@/lib/env';
+import { getPublicBiodataUrl } from '@/utils/site';
 
 export type ShareResult = 'shared' | 'copied' | 'cancelled' | 'unavailable';
 

@@ -1,20 +1,17 @@
 import { Suspense, lazy } from 'react';
 import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom';
-import { QueryClientProvider } from '@tanstack/react-query';
-import { queryClient } from '@/lib/queryClient';
-import { AuthProvider } from '@/hooks/useAuth';
 import { ThemeProvider } from '@/hooks/useTheme';
 import { ToastProvider } from '@/hooks/useToast';
+import { AdminSessionProvider } from '@/hooks/useAdminSession';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Toaster } from '@/components/ui/Toaster';
-import { ProtectedRoute } from '@/components/admin/ProtectedRoute';
 import { LoadingState } from '@/components/ui/States';
-import PublicBiodataPage from '@/pages/PublicBiodataPage';
+import { loadedBiodata } from '@/utils/biodata';
+import PublicBiodataPage, { InvalidBiodataPage } from '@/pages/PublicBiodataPage';
 
-/* The admin dashboard is a separate bundle: visitors to the public biodata
-   never download the editor, forms or validation code. */
-const LoginPage = lazy(() => import('@/pages/LoginPage'));
-const AdminLayout = lazy(() => import('@/layouts/AdminLayout'));
+/* The dashboard is a separate bundle: visitors to the public biodata never
+   download the editor, the forms or the GitHub client. */
+const AdminGate = lazy(() => import('@/components/admin/AdminGate'));
 const DashboardPage = lazy(() => import('@/pages/admin/DashboardPage'));
 const PersonalPage = lazy(() => import('@/pages/admin/PersonalPage'));
 const FamilyPage = lazy(() => import('@/pages/admin/FamilyPage'));
@@ -24,25 +21,28 @@ const CareerPage = lazy(() => import('@/pages/admin/CareerPage'));
 const HobbiesPage = lazy(() => import('@/pages/admin/HobbiesPage'));
 const ContactPage = lazy(() => import('@/pages/admin/ContactPage'));
 const PhotoPage = lazy(() => import('@/pages/admin/PhotoPage'));
-const SettingsPage = lazy(() => import('@/pages/admin/SettingsPage'));
+const AppearancePage = lazy(() => import('@/pages/admin/AppearancePage'));
+const PreviewPage = lazy(() => import('@/pages/admin/PreviewPage'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
 
-/**
- * A data router (rather than <BrowserRouter>) is required for `useBlocker`,
- * which is what warns an admin before they navigate away from unsaved edits.
- */
-const router = createBrowserRouter([
-  // Public — no authentication required
-  { path: '/', element: <PublicBiodataPage /> },
-  { path: '/login', element: <LoginPage /> },
+const { data: biodata, issues } = loadedBiodata;
 
-  // Protected admin dashboard
+/** Theme defaults come from the JSON; falls back if the file is unreadable. */
+const theme = biodata?.theme ?? { mode: 'light' as const, accent: 'champagne' as const, animations: true };
+
+const router = createBrowserRouter([
+  {
+    path: '/',
+    element: biodata ? <PublicBiodataPage biodata={biodata} /> : <InvalidBiodataPage issues={issues} />,
+  },
   {
     path: '/admin',
+    // The session provider lives here, not at the root, so the public page
+    // never issues an /api/admin/session request.
     element: (
-      <ProtectedRoute>
-        <AdminLayout />
-      </ProtectedRoute>
+      <AdminSessionProvider>
+        <AdminGate />
+      </AdminSessionProvider>
     ),
     children: [
       { index: true, element: <DashboardPage /> },
@@ -54,30 +54,25 @@ const router = createBrowserRouter([
       { path: 'hobbies', element: <HobbiesPage /> },
       { path: 'contact', element: <ContactPage /> },
       { path: 'photo', element: <PhotoPage /> },
-      { path: 'settings', element: <SettingsPage /> },
+      { path: 'appearance', element: <AppearancePage /> },
+      { path: 'preview', element: <PreviewPage /> },
       { path: '*', element: <Navigate to="/admin" replace /> },
     ],
   },
-
   { path: '*', element: <NotFoundPage /> },
 ]);
 
 export function App() {
   return (
     <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider>
-          <ToastProvider>
-            {/* AuthProvider uses no router hooks, so it can wrap the router. */}
-            <AuthProvider>
-              <Suspense fallback={<LoadingState message="Loading…" />}>
-                <RouterProvider router={router} />
-              </Suspense>
-              <Toaster />
-            </AuthProvider>
-          </ToastProvider>
-        </ThemeProvider>
-      </QueryClientProvider>
+      <ThemeProvider defaultMode={theme.mode} accent={theme.accent} animations={theme.animations}>
+        <ToastProvider>
+          <Suspense fallback={<LoadingState message="Loading…" />}>
+            <RouterProvider router={router} />
+          </Suspense>
+          <Toaster />
+        </ToastProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }

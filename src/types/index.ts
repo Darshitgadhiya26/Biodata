@@ -1,63 +1,20 @@
-import type { BiodataRow, HobbyRow, MaternalRelativeRow } from './database';
-
-/** A marriage biodata profile as the UI consumes it. */
-export type Biodata = BiodataRow;
-
-/** A single hobby / interest entry. */
-export type Hobby = HobbyRow;
-
-/** A single maternal-side relative. */
-export type MaternalRelative = MaternalRelativeRow;
-
-/** The signed-in administrator (a Supabase Auth user). */
-export interface AdminUser {
-  id: string;
-  email: string | null;
-  lastSignInAt: string | null;
-}
-
-/** Everything the public page and the live preview need to render. */
-export interface BiodataBundle {
-  biodata: Biodata;
-  hobbies: Hobby[];
-  maternalRelatives: MaternalRelative[];
-}
-
-/** Fields an admin may edit. Server-managed columns are deliberately absent. */
-export type BiodataEditableFields = Pick<
+/**
+ * Shared UI types.
+ *
+ * The biodata shape itself is not redeclared here — it is inferred from the Zod
+ * schema in `src/utils/biodata-schema.ts`, so the validator and the types can
+ * never drift apart.
+ */
+export type {
+  Accent,
   Biodata,
-  | 'name'
-  | 'date_of_birth'
-  | 'caste'
-  | 'height'
-  | 'weight'
-  | 'blood_group'
-  | 'father_name'
-  | 'father_occupation'
-  | 'mother_name'
-  | 'maternal_address'
-  | 'degree'
-  | 'college'
-  | 'job_title'
-  | 'company'
-  | 'work_location'
-  | 'phone'
-  | 'address'
->;
+  FieldIssue,
+  ThemeMode,
+  ValidationResult,
+} from '@/utils/biodata-schema';
 
-export type BiodataUpdate = Partial<BiodataEditableFields> & {
-  profile_photo_url?: string | null;
-  profile_photo_path?: string | null;
-  is_published?: boolean;
-};
-
-/** A draft ordered item used by the hobbies / maternal editors. */
-export interface OrderedItemInput {
-  name: string;
-  display_order: number;
-}
-
-export type ThemeMode = 'light' | 'dark' | 'system';
+/** What the theme toggle offers the visitor (a browser-local override). */
+export type ThemePreference = 'light' | 'dark' | 'system';
 
 export type ToastVariant = 'success' | 'error' | 'info';
 
@@ -69,15 +26,56 @@ export interface Toast {
   duration: number;
 }
 
-/** Normalised error surfaced by the service layer. */
-export class BiodataError extends Error {
-  readonly cause?: unknown;
-  readonly code?: string;
+/** The `data/biodata.json` file as GitHub currently holds it. */
+export interface BiodataFile {
+  /** Parsed contents. */
+  data: import('@/utils/biodata-schema').Biodata;
+  /** Git blob SHA — required to publish without clobbering someone else. */
+  sha: string;
+  /** Branch the file was read from. */
+  branch: string;
+  /** `owner/repo`. */
+  repo: string;
+  /** ISO timestamp of the commit that last touched the file, when known. */
+  lastCommitAt: string | null;
+  /** Permalink to the file on github.com. */
+  htmlUrl: string | null;
+}
 
-  constructor(message: string, options?: { cause?: unknown; code?: string }) {
+/** Result of a successful publish. */
+export interface PublishResult {
+  sha: string;
+  commitUrl: string | null;
+  committedAt: string | null;
+}
+
+/** Anything the API layer rejected, normalised for the UI. */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code: string;
+  readonly issues: import('@/utils/biodata-schema').FieldIssue[];
+
+  constructor(
+    message: string,
+    options: {
+      status?: number;
+      code?: string;
+      issues?: import('@/utils/biodata-schema').FieldIssue[];
+    } = {},
+  ) {
     super(message);
-    this.name = 'BiodataError';
-    this.cause = options?.cause;
-    this.code = options?.code;
+    this.name = 'ApiError';
+    this.status = options.status ?? 0;
+    this.code = options.code ?? 'unknown_error';
+    this.issues = options.issues ?? [];
+  }
+
+  /** True when the file changed in GitHub since the editor loaded it. */
+  get isConflict(): boolean {
+    return this.code === 'sha_conflict' || this.status === 409;
+  }
+
+  get isUnauthorized(): boolean {
+    return this.status === 401;
   }
 }

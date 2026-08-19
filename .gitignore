@@ -40,8 +40,3 @@ pnpm-debug.log*
 .eslintcache
 node_modules/.tmp/
 *.tsbuildinfo
-
-# Supabase CLI
-supabase/.branches
-supabase/.temp
-supabase/.env

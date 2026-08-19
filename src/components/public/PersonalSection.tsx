@@ -5,21 +5,24 @@ import { InfoCard } from './InfoCard';
 import { Reveal } from './Reveal';
 import { Section } from './Section';
 
+/** Reads `biodata.personal`. Nothing on this page is hardcoded. */
 export function PersonalSection({ biodata, still = false }: { biodata: Biodata; still?: boolean }) {
-  const age = calculateAge(biodata.date_of_birth);
-  const dateOfBirth = formatDateLong(biodata.date_of_birth);
+  const { personal } = biodata;
+
+  const age = calculateAge(personal.dateOfBirth);
+  const dateOfBirth = formatDateLong(personal.dateOfBirth);
 
   const items = [
-    { icon: User, label: 'Name', value: biodata.name },
+    { icon: User, label: 'Name', value: personal.name },
     {
       icon: CalendarDays,
       label: 'Date of Birth',
       value: dateOfBirth ? (age !== null ? `${dateOfBirth} (${age} years)` : dateOfBirth) : '',
     },
-    { icon: Users, label: 'Caste', value: biodata.caste },
-    { icon: Ruler, label: 'Height', value: biodata.height },
-    { icon: Weight, label: 'Weight', value: biodata.weight },
-    { icon: Droplet, label: 'Blood Group', value: biodata.blood_group },
+    { icon: Users, label: 'Caste', value: personal.caste },
+    { icon: Ruler, label: 'Height', value: personal.height },
+    { icon: Weight, label: 'Weight', value: personal.weight },
+    { icon: Droplet, label: 'Blood Group', value: personal.bloodGroup },
   ];
 
   return (

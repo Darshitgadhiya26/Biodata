@@ -1,4 +1,4 @@
-import type { Biodata, Hobby, MaternalRelative } from '@/types';
+import type { Biodata } from '@/types';
 import { Hero } from './Hero';
 import { PersonalSection } from './PersonalSection';
 import { FamilySection } from './FamilySection';
@@ -10,8 +10,6 @@ import { ContactSection } from './ContactSection';
 
 interface BiodataViewProps {
   biodata: Biodata;
-  hobbies: Hobby[];
-  maternalRelatives: MaternalRelative[];
   /** Turns off animations and tightens spacing — used by the admin preview. */
   still?: boolean;
 }
@@ -21,9 +19,9 @@ interface BiodataViewProps {
  *
  * Shared verbatim between the public page and the admin's live preview, which
  * is what guarantees "what you see while editing is what visitors get". Every
- * value is a prop — nothing here is hardcoded.
+ * value is a prop read from `data/biodata.json` — nothing here is hardcoded.
  */
-export function BiodataView({ biodata, hobbies, maternalRelatives, still = false }: BiodataViewProps) {
+export function BiodataView({ biodata, still = false }: BiodataViewProps) {
   return (
     <>
       <Hero biodata={biodata} still={still} />
@@ -35,10 +33,10 @@ export function BiodataView({ biodata, hobbies, maternalRelatives, still = false
 
       <PersonalSection biodata={biodata} still={still} />
       <FamilySection biodata={biodata} still={still} />
-      <MaternalSection biodata={biodata} relatives={maternalRelatives} still={still} />
+      <MaternalSection biodata={biodata} still={still} />
       <EducationSection biodata={biodata} still={still} />
       <CareerSection biodata={biodata} still={still} />
-      <HobbiesSection hobbies={hobbies} still={still} />
+      <HobbiesSection biodata={biodata} still={still} />
       <ContactSection biodata={biodata} still={still} />
     </>
   );

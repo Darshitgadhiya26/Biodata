@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Download, Link2, Printer, QrCode as QrCodeIcon, Share2 } from 'lucide-react';
-import { getPublicBiodataUrl } from '@/lib/env';
+import { getPublicBiodataUrl, isLocalHost } from '@/utils/site';
 import { useToast } from '@/hooks/useToast';
 import { copyLink } from '@/utils/share';
 import { Button } from '@/components/ui/Button';
@@ -24,6 +24,7 @@ interface ShareSectionProps {
 export function ShareSection({ name, onShare }: ShareSectionProps) {
   const toast = useToast();
   const [showQr, setShowQr] = useState(false);
+  // Always the address the visitor is actually on — never a hardcoded URL.
   const publicUrl = getPublicBiodataUrl();
 
   const handlePrint = (asPdf: boolean) => {
@@ -94,6 +95,11 @@ export function ShareSection({ name, onShare }: ShareSectionProps) {
                 <QrCode value={publicUrl} size={200} label={`QR code linking to the marriage biodata of ${name}`} />
                 <p className="text-sm font-medium text-charcoal">Scan to view biodata</p>
                 <p className="max-w-xs break-all text-xs text-subtle">{publicUrl}</p>
+                {isLocalHost() && (
+                  <p className="max-w-xs text-xs text-danger">
+                    This is a local development address. The deployed site produces a public URL.
+                  </p>
+                )}
               </div>
             ) : (
               <Button

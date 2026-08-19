@@ -1,56 +1,69 @@
-import { useAdminBundle } from '@/layouts/AdminLayout';
-import { BiodataSectionForm, type FieldDefinition } from '@/components/admin/BiodataSectionForm';
-import { OrderedListEditor } from '@/components/admin/OrderedListEditor';
-import {
-  useAddMaternalRelative,
-  useDeleteMaternalRelative,
-  useReorderMaternalRelatives,
-  useUpdateMaternalRelative,
-} from '@/hooks/useMaternal';
-import { maternalSchema } from '@/utils/validation';
+import { useMemo } from 'react';
+import { useDraft, useDraftData, useFieldErrors } from '@/hooks/useDraft';
+import { EditorPanel } from '@/components/admin/EditorPanel';
+import { ListEditor } from '@/components/admin/ListEditor';
+import { TextAreaField } from '@/components/ui/Field';
 
-const FIELDS: FieldDefinition[] = [
-  {
-    name: 'maternal_address',
-    label: 'Maternal Address',
-    type: 'textarea',
-    rows: 4,
-    placeholder: 'One line per row',
-    hint: 'Each line appears on its own row in the maternal card.',
-  },
-];
-
+/** Edits `maternal` — an ordered list of relatives plus the mosal address. */
 export function MaternalPage() {
-  const { biodata, hobbies, maternalRelatives } = useAdminBundle();
+  const { update, issues } = useDraft();
+  const { maternal } = useDraftData();
+  const errorFor = useFieldErrors();
 
-  const addRelative = useAddMaternalRelative(biodata.id);
-  const updateRelative = useUpdateMaternalRelative(biodata.id);
-  const deleteRelative = useDeleteMaternalRelative(biodata.id);
-  const reorderRelatives = useReorderMaternalRelatives(biodata.id);
+  // Schema issues arrive as `maternal.relatives.0` — map them back to indexes.
+  const relativeErrors = useMemo(() => {
+    const map: Record<number, string> = {};
+    for (const issue of issues) {
+      const match = /^maternal\.relatives\.(\d+)$/.exec(issue.path);
+      if (match) map[Number(match[1])] = issue.message;
+    }
+    return map;
+  }, [issues]);
 
   return (
-    <BiodataSectionForm
-      biodata={biodata}
-      hobbies={hobbies}
-      maternalRelatives={maternalRelatives}
+    <EditorPanel
       title="Maternal Details"
-      description="Maternal relatives and the maternal address."
-      fields={FIELDS}
-      schema={maternalSchema}
-      previewSection="maternal"
+      description="Add, edit, delete and reorder maternal relatives. The order here is the order shown on the biodata."
+      footnote="Stored under “maternal” in data/biodata.json."
     >
-      <OrderedListEditor
-        items={maternalRelatives}
-        itemLabel="Relative"
-        addLabel="Add a maternal relative"
-        placeholder="e.g. Jaysukhbhai Nanubhai Borad"
-        emptyMessage="Add the maternal relatives you would like shown on the biodata."
-        onAdd={(name, displayOrder) => addRelative.mutateAsync({ name, displayOrder })}
-        onUpdate={(id, name) => updateRelative.mutateAsync({ id, name })}
-        onDelete={(id) => deleteRelative.mutateAsync(id)}
-        onReorder={(items) => reorderRelatives.mutateAsync(items)}
-      />
-    </BiodataSectionForm>
+      <div className="space-y-7">
+        <div>
+          <h2 className="mb-3 text-sm font-semibold text-charcoal">Maternal relatives</h2>
+          <ListEditor
+            items={maternal.relatives}
+            itemLabel="relative"
+            addLabel="Add relative"
+            placeholder="Jaysukhbhai Nanubhai Borad"
+            emptyMessage="No maternal relatives yet"
+            errors={relativeErrors}
+            onChange={(relatives) =>
+              update((current) => ({ ...current, maternal: { ...current.maternal, relatives } }))
+            }
+          />
+          {errorFor('maternal.relatives') && (
+            <p role="alert" className="mt-2 text-xs font-medium text-danger">
+              {errorFor('maternal.relatives')}
+            </p>
+          )}
+        </div>
+
+        <TextAreaField
+          label="Maternal address"
+          name="maternalAddress"
+          rows={3}
+          value={maternal.address}
+          onChange={(event) =>
+            update((current) => ({
+              ...current,
+              maternal: { ...current.maternal, address: event.target.value },
+            }))
+          }
+          placeholder="At. Bandharda, Ta. Gir Gadhada, Dist. Gir Somnath"
+          hint="Optional. Commas and line breaks each start a new line."
+          error={errorFor('maternal.address')}
+        />
+      </div>
+    </EditorPanel>
   );
 }
 

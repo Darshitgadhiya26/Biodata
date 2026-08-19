@@ -1,0 +1,45 @@
+{
+  "personal": {
+    "name": "Darshit Gadhiya",
+    "dateOfBirth": "26-11-2001",
+    "caste": "Leuva Patel",
+    "height": "5 feet 6 inches",
+    "weight": "75 Kg",
+    "bloodGroup": "B+"
+  },
+  "family": {
+    "fatherName": "Dilipbhai Manjibhai Gadhiya",
+    "fatherOccupation": "Agriculture (27 Vigha)",
+    "motherName": "Kanchanben"
+  },
+  "maternal": {
+    "relatives": [
+      "Jaysukhbhai Nanubhai Borad",
+      "Rasikbhai Nanubhai Borad"
+    ],
+    "address": "At. Bandharda, Ta. Gir Gadhada, Dist. Gir Somnath"
+  },
+  "education": {
+    "degree": "B.Tech in Computer",
+    "college": "Darshan University Rajkot"
+  },
+  "career": {
+    "job": "Software Engineer",
+    "company": "Technomark Solutions",
+    "workLocation": "Ahemedabad"
+  },
+  "hobbies": [
+    "Movies",
+    "Cricket"
+  ],
+  "contact": {
+    "phone": "7069306559",
+    "address": "Kanakiya, Ta. Gir Gadhada, Dist. Gir Somnath"
+  },
+  "profilePhoto": "/images/profile.jpg",
+  "theme": {
+    "mode": "light",
+    "accent": "champagne",
+    "animations": true
+  }
+}

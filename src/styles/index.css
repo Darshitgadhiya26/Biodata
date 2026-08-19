@@ -45,6 +45,55 @@
     color-scheme: dark;
   }
 
+  /* ------------------------------------------------------------
+     Accent palettes — `theme.accent` in data/biodata.json is written
+     to <html data-accent="…"> before first paint. Champagne is the
+     default and is already declared above.
+     ------------------------------------------------------------ */
+  [data-accent='rose'] {
+    --c-gold: 183 110 121;
+    --c-gold-soft: 214 160 168;
+    --c-gold-deep: 143 78 90;
+  }
+
+  [data-accent='emerald'] {
+    --c-gold: 42 122 96;
+    --c-gold-soft: 122 176 156;
+    --c-gold-deep: 24 88 68;
+  }
+
+  [data-accent='sapphire'] {
+    --c-gold: 62 96 158;
+    --c-gold-soft: 132 160 208;
+    --c-gold-deep: 40 68 122;
+  }
+
+  /* Dark needs brighter accents to hold contrast against the espresso
+     background. Written after the light rules so they win. */
+  .dark[data-accent='champagne'] {
+    --c-gold: 214 181 122;
+    --c-gold-soft: 233 209 165;
+    --c-gold-deep: 176 141 76;
+  }
+
+  .dark[data-accent='rose'] {
+    --c-gold: 214 156 164;
+    --c-gold-soft: 233 190 196;
+    --c-gold-deep: 183 110 121;
+  }
+
+  .dark[data-accent='emerald'] {
+    --c-gold: 122 190 164;
+    --c-gold-soft: 168 214 196;
+    --c-gold-deep: 42 122 96;
+  }
+
+  .dark[data-accent='sapphire'] {
+    --c-gold: 140 172 220;
+    --c-gold-soft: 180 202 236;
+    --c-gold-deep: 62 96 158;
+  }
+
   * {
     @apply border-line;
   }
@@ -181,9 +230,13 @@
     color: #16150f !important;
   }
 
-  /* Force the light palette on paper regardless of the on-screen theme */
+  /* Force the light palette on paper regardless of the on-screen theme or
+     accent. Listed with matching specificity, and later in the sheet, so these
+     win over the .dark[data-accent] rules above. */
   html,
-  html.dark {
+  html.dark,
+  html[data-accent],
+  html.dark[data-accent] {
     --c-ivory: 255 255 255;
     --c-surface: 255 255 255;
     --c-surface-raised: 255 255 255;

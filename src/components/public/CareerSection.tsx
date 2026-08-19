@@ -3,10 +3,13 @@ import type { Biodata } from '@/types';
 import { Reveal } from './Reveal';
 import { Section } from './Section';
 
+/** Reads `biodata.career`. */
 export function CareerSection({ biodata, still = false }: { biodata: Biodata; still?: boolean }) {
+  const { career } = biodata;
+
   const rows = [
-    { icon: Building2, label: 'Company', value: biodata.company },
-    { icon: MapPin, label: 'Work Location', value: biodata.work_location },
+    { icon: Building2, label: 'Company', value: career.company },
+    { icon: MapPin, label: 'Work Location', value: career.workLocation },
   ];
 
   return (
@@ -28,7 +31,7 @@ export function CareerSection({ biodata, still = false }: { biodata: Biodata; st
               <div className="min-w-0">
                 <p className="text-[0.68rem] font-medium uppercase tracking-wideish text-subtle">Current Role</p>
                 <h3 className="mt-1.5 font-display text-2xl font-semibold leading-tight text-charcoal sm:text-3xl">
-                  {biodata.job_title || '—'}
+                  {career.job || '—'}
                 </h3>
               </div>
             </header>
